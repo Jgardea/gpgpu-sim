@@ -1,0 +1,28 @@
+
+#include "DSENT.h"
+#include <iostream>
+#include <vector>
+
+using namespace std;
+
+int main(int argc, char** argv)
+{
+    //std::cout << "argc: " << argc << std::endl << "argv: ";
+    //for (int i = 0; i < argc; i++ )
+    //{
+    //    std::cout << argv[i] << " "; 
+    //}
+    //std::cout << std::endl; 
+    //DSENT::DSENT::run(argc-1, argv+1);
+    
+   vector<string> config_dsent;
+   config_dsent.push_back("-cfg");
+   config_dsent.push_back("electrical-mesh.cfg");
+       
+   //vector< pair<String, vector<pair<String, double> > > > energy_results;
+   //energy_results = 
+   DSENT::DSENT::run(config_dsent);
+
+    return 0;
+}
+

@@ -1,0 +1,223 @@
+// $Id$
+
+/*
+ Copyright (c) 2007-2015, Trustees of The Leland Stanford Junior University
+ All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+
+ Redistributions of source code must retain the above copyright notice, this 
+ list of conditions and the following disclaimer.
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
+ other materials provided with the distribution.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+#ifndef _IQ3D_ROUTER_HPP_
+#define _IQ3D_ROUTER_HPP_
+
+#include <string>
+#include <deque>
+#include <queue>
+#include <set>
+#include <map>
+
+#include "router.hpp"
+#include "routefunc.hpp"
+
+using namespace std;
+
+class VC;
+class Flit;
+class Credit;
+class Buffer;
+class BufferState;
+class Allocator;
+class RoundRobinArbiter; // jgardea
+class SwitchMonitor;
+class BufferMonitor;
+
+class IQ3DRouter : public Router {
+
+  typedef struct {  //info needed for vertical arbitration // jgardea
+    int input;          
+    int output;
+    int vc;
+    int index;
+  } vertical_req;
+  
+  bool debug;  // jgardea
+
+  int _vcs;
+
+  bool _vc_busy_when_full;
+  bool _vc_prioritize_empty;
+  bool _vc_shuffle_requests;
+
+  bool _speculative;
+  bool _spec_check_elig;
+  bool _spec_check_cred;
+  bool _spec_mask_by_reqs;
+ 
+  int _zvalue;  // it is used to segment virtual channels for different layers jgardea
+
+  bool _active;
+  bool _active_AfterSA; // jgardea
+
+  int _routing_delay;
+  int _vc_alloc_delay;
+  int _sw_alloc_delay;
+  int _verc_arb_delay; //jgardea
+
+  vector<int> _currentPckt; //jgardea ... used for credit tracking
+
+  map<int, Flit *> _in_queue_flits;
+
+  deque<pair<int, pair<Credit *, int> > > _proc_credits;
+
+  deque<pair<int, pair<int, int> > > _route_vcs;
+  deque<pair<int, pair<pair<int, int>, int> > > _vc_alloc_vcs;  
+  deque<pair<int, pair<pair<int, int>, int> > > _sw_hold_vcs;
+  deque<pair<int, pair<pair<int, int>, int> > > _sw_alloc_vcs;
+  deque<pair<int, pair<Flit *, pair<int, int> > > > _crossbar_flits;
+
+  map<int, Credit *> _out_queue_credits;
+
+  vector<Buffer *> _buf;
+  vector<BufferState *> _next_buf;
+
+  Allocator *_vc_allocator;
+  Allocator *_sw_allocator;
+  Allocator *_spec_sw_allocator;
+
+  RoundRobinArbiter *_upc_arbiter;   // jgardea
+  RoundRobinArbiter *_downc_arbiter; // jgardea
+
+  vertical_req  _upc_vertical_req;    // jgardea
+  vertical_req  _downc_vertical_req;  // jgardea
+
+  vector<int> _vc_rr_offset;
+  vector<int> _sw_rr_offset;
+
+  tRoutingFunction   _rf;
+
+  int _output_buffer_size;
+  vector<queue<Flit *> > _output_buffer;
+
+  vector<queue<Credit *> > _credit_buffer;
+
+  bool _hold_switch_for_packet;
+  vector<int> _switch_hold_in;
+  vector<int> _switch_hold_out;
+  vector<int> _switch_hold_vc;
+
+  bool _noq;
+  vector<vector<int> > _noq_next_output_port;
+  vector<vector<int> > _noq_next_vc_start;
+  vector<vector<int> > _noq_next_vc_end;
+
+  long _cycles;                         // jgardea 
+
+#ifdef TRACK_FLOWS
+  vector<vector<queue<int> > > _outstanding_classes;
+#endif
+
+  bool _ReceiveFlits( );
+  int  _findPckt( int pid ); // jgardea
+  bool _ReceiveCredits( );
+
+  virtual void _InternalStep( );
+  void _InternalStep_AfterSA( ); // jgardea ... post SWA internal steps 
+
+  bool _SWAllocAddReq(int input, int vc, int output);
+
+  void _InputQueuing( );
+
+  void _RouteEvaluate( );
+  void _VCAllocEvaluate( );
+  void _SWHoldEvaluate( );
+  void _SWAllocEvaluate( );
+  void _AddVerticalRequest( int direction, int input, int vc, int output, int index ); //jgardea
+  void _VerChannelArbitration(  ); // jgardea
+  void _SwitchEvaluate( );
+
+  void _RouteUpdate( );
+  void _VCAllocUpdate( );
+  void _SWHoldUpdate( );
+  void _SWAllocUpdate( );
+  void _SwitchUpdate( );
+  
+  void _OutputQueuing( );
+
+  void _SendFlits( );
+  void _SendCredits( );
+  
+  void _UpdateNOQ(int input, int vc, Flit const * f);
+
+  // ----------------------------------------
+  //
+  //   Router Power Modellingyes
+  //
+  // ----------------------------------------
+
+  SwitchMonitor * _switchMonitor ;
+  BufferMonitor * _bufferMonitor ;
+  
+public:
+
+  IQ3DRouter( Configuration const & config,
+	    Module *parent, string const & name, int id,
+	    int inputs, int outputs, RoundRobinArbiter* up_arbiter, RoundRobinArbiter* down_arbiter ); //jgardea
+  
+  virtual ~IQ3DRouter( );
+ 
+  //virtual void AddOutputChannel(FlitChannel * channel, CreditChannel * backchannel, bool isVertical = 0); // jgardea
+
+  virtual void AddOutputChannel(FlitChannel * channel, CreditChannel * backchannel ); // jgardea
+
+  virtual void ClearVerticalArbiters( );
+
+  inline bool VerticalArbiters( ) { return ( (_upc_arbiter) ? true : false ); }
+
+  virtual void ReadInputs( );
+  virtual void WriteOutputs( );
+
+  void Evaluate_AfterSA( ); // jgardea
+
+  inline long NumberCycles( ) // jgardea
+  {
+      return _cycles;
+  }
+  
+  void Display( ostream & os = cout ) const;
+
+  virtual int GetUsedCredit(int o) const;
+  virtual int GetBufferOccupancy(int i) const;
+
+#ifdef TRACK_BUFFERS
+  virtual int GetUsedCreditForClass(int output, int cl) const;
+  virtual int GetBufferOccupancyForClass(int input, int cl) const;
+#endif
+
+  virtual vector<int> UsedCredits() const;
+  virtual vector<int> FreeCredits() const;
+  virtual vector<int> MaxCredits() const;
+
+  SwitchMonitor const * const GetSwitchMonitor() const {return _switchMonitor;}
+  BufferMonitor const * const GetBufferMonitor() const {return _bufferMonitor;}
+
+};
+
+#endif
