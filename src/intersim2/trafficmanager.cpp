@@ -303,7 +303,7 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
 
     // ============ Injection queues ============ jgardea 
     // All injection queues have been augmented to add subnets in case that _subnets > 1
-    // Each router in each subnet now has a memory interface.
+    // Each router in each subnet now has a quque in the network interface.
 
     _qtime.resize(_nodes);   
     _qdrained.resize(_nodes); 
@@ -631,9 +631,6 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
 
     _slowest_flit.resize(_classes, -1);
     _slowest_packet.resize(_classes, -1);
-
- 
-
 }
 
 TrafficManager::~TrafficManager( )
@@ -908,7 +905,7 @@ bool TrafficManager::_GeneratePacket( int source, int stype,  // jgardea
             rinfo->Free();
         }
     }
-    else
+    else // jgardea
     {
       subnetwork = _SubnetSelection(source, cl, packet_type); // jgardea 
       if(subnetwork < 0 ) return false;
@@ -926,10 +923,6 @@ bool TrafficManager::_GeneratePacket( int source, int stype,  // jgardea
         record = _measure_stats[cl];
     }
   
-    //int subnetwork = ((packet_type == Flit::ANY_TYPE) ?  // original code 
-    //                  RandomInt(_subnets-1) :
-    //                  _subnet[packet_type]);
-
     if ( watch ) { 
         *gWatchOut << GetSimTime() << " | "
                    << "node" << source << " | "
@@ -1021,7 +1014,7 @@ void TrafficManager::_Inject()
         int net;
         for ( net = 0; net < _subnets; net ++ )
         {
-          if ( _subnet_available[input][net][c] )
+          if ( _subnet_available[input][net][c] ) // jgardea
           {
             available_net = true;
             break;
@@ -1033,13 +1026,12 @@ void TrafficManager::_Inject()
            
           while( !generated && ( _qtime[input][c] <= _time ) )  
           {
-              int stype = _IssuePacket( input, c ); //decide if we should generate packe and the type of packet 
+              int stype = _IssuePacket( input, c ); //decide if we should generate packet and the type of packet 
 
               if ( stype != 0 ) { //generate a packet
                   generated = _GeneratePacket( input, stype, c, 
                                    _include_queuing==1 ? 
                                    _qtime[input][c] : _time );  
-                  //generated = true;
                   if ( (stype < 0) && !generated ) break;
               }
               // only advance time if this is not a reply packet

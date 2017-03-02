@@ -4,12 +4,15 @@ src/intersim2/y.tab.h
 src/intersim2/obj/*
 src/intersim2/run
 src/intersim2/test
-src/intersim2/f
+
 
 libcuda/cuobjdump_lexer.c
 libcuda/cuobjdump_parser.c
 libcuda/cuobjdump_parser.h
 libcuda/cuobjdump_parser.output
+
+/home/kaya1/jgardea/GPGPU-SIM/gpgpu-sim/src/f
+src/intersim2/f
 
 lib/*
 

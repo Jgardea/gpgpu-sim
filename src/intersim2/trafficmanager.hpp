@@ -129,7 +129,6 @@ protected:
   //vector< vector<vector<int> > > _qtime;
   //vector< vector<vector<bool> > > _qdrained;
   vector<vector<vector<list<Flit *> > > > _partial_packets;  
-
   vector< vector< vector<bool> > > _subnet_available;
 
   // ... jgardea

@@ -78,28 +78,28 @@ void Mesh3D::Evaluate( )
           
   }
 
-  vector<Router*>::iterator iter; // jgardea
-     
-  IQ3DRouter* r; // jgardea
+  // =================== Vertical Arbitration ========================= jgardea
+  // It is necessary to devide iq3d routers evaluation to pre and post swich allocation 
+  // to make sure we have the all the inputs to the vertical arbitraiton
 
-  for( iter = _routers.begin(); iter != _routers.end(); iter++ )   // jgardea
+  vector<Router*>::iterator iter;
+  IQ3DRouter* r;
+
+  for( iter = _routers.begin(); iter != _routers.end(); iter++ )
   {
     r = (IQ3DRouter *) (*iter);
     r->Evaluate_AfterSA( );
   }
 
-  for( iter = _routers.begin(); iter != _routers.end(); iter++ )   // jgardea
+  for( iter = _routers.begin(); iter != _routers.end(); iter++ )
   {
     r = (IQ3DRouter *) (*iter);
-    //if ( !r->VerticalArbiters() ) break;
       r->ClearVerticalArbiters();
   }
 }
 
 void Mesh3D::_BuildNet( const Configuration &config )
 {
- // zxy_reply = config.GetInt("zxy_reply") ? 1 : 0;
-
   int adj_node;
   int adj_input;
   int adj_output;

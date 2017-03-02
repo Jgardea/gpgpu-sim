@@ -242,7 +242,7 @@ void GPUTrafficManager::_GeneratePacket(int source, int stype, int cl, int time,
   if ((packet_destination <0) || (packet_destination >= _nodes)) {
     ostringstream err;
     err << "Incorrect packet destination " << packet_destination
-    << " for stype " << packet_type;
+        << " for stype " << packet_type;
     Error( err.str( ) );
   }
   
@@ -250,11 +250,6 @@ void GPUTrafficManager::_GeneratePacket(int source, int stype, int cl, int time,
       ( ( _sim_state == draining ) && ( time < _drain_time ) ) ) {
     record = _measure_stats[cl];
   }
-  
-  int subnetwork = subnet;
-  //                ((packet_type == Flit::ANY_TYPE) ?
-  //                    RandomInt(_subnets-1) :
-  //                    _subnet[packet_type]);
   
   if ( watch ) {
     *gWatchOut << GetSimTime() << " | "
@@ -345,11 +340,15 @@ void GPUTrafficManager::_Step()
   
   vector<map<int, Flit *> > flits(_subnets);
   
-  for ( int subnet = 0; subnet < _subnets; ++subnet ) {
-    for ( int n = 0; n < _nodes; ++n ) {
+  for ( int subnet = 0; subnet < _subnets; ++subnet ) 
+  {
+    for ( int n = 0; n < _nodes; ++n ) 
+    {
       Flit * const f = _net[subnet]->ReadFlit( n );
-      if ( f ) {
-        if(f->watch) {
+      if ( f ) 
+      {
+        if(f->watch) 
+        {
           *gWatchOut << GetSimTime() << " | "
           << "node" << n << " | "
           << "Ejecting flit " << f->id
@@ -362,9 +361,11 @@ void GPUTrafficManager::_Step()
       
       g_icnt_interface->Transfer2BoundaryBuffer(subnet, n);
       Flit* const ejected_flit = g_icnt_interface->GetEjectedFlit(subnet, n);
-      if (ejected_flit) {
+      if (ejected_flit) 
+      {
         if(ejected_flit->head)
           assert(ejected_flit->dest == n);
+
         if(ejected_flit->watch) {
           *gWatchOut << GetSimTime() << " | "
           << "node" << n << " | "
@@ -373,8 +374,10 @@ void GPUTrafficManager::_Step()
           << " VC " << ejected_flit->vc << ")"
           << "from ejection buffer." << endl;
         }
+
         flits[subnet].insert(make_pair(n, ejected_flit));
-        if((_sim_state == warming_up) || (_sim_state == running)) {
+        if((_sim_state == warming_up) || (_sim_state == running)) 
+        {
           ++_accepted_flits[ejected_flit->cl][n];
           if(ejected_flit->tail) {
             ++_accepted_packets[ejected_flit->cl][n];
@@ -528,7 +531,7 @@ void GPUTrafficManager::_Step()
               }
             }
           }
-        }
+        } // allocating vc for new packet
         
         if(cf->vc == -1) {
           if(cf->watch) {
@@ -548,7 +551,7 @@ void GPUTrafficManager::_Step()
             f = cf;
           }
         }
-      }
+      } //traverse classes to allocate vc to new packets
       
       if(f) {
         
@@ -564,7 +567,7 @@ void GPUTrafficManager::_Step()
               const Router * router = inject->GetSink();
               assert(router);
               int in_channel = inject->GetSinkPort();
-              _rf(router, f, in_channel, &f->la_route_set, false);
+              _rf(router, f, in_channel, &f->la_route_set, false); // calculate next node
               if(f->watch) {
                 *gWatchOut << GetSimTime() << " | "
                 << "node" << n << " | "
@@ -633,12 +636,16 @@ void GPUTrafficManager::_Step()
         
       }
     }
-  }
+  } // end vc alloc, la_routing, writingFlit 
+
   //Send the credit To the network
-  for(int subnet = 0; subnet < _subnets; ++subnet) {
-    for(int n = 0; n < _nodes; ++n) {
+  for(int subnet = 0; subnet < _subnets; ++subnet) 
+  {
+    for(int n = 0; n < _nodes; ++n) 
+    {
       map<int, Flit *>::const_iterator iter = flits[subnet].find(n);
-      if(iter != flits[subnet].end()) {
+      if(iter != flits[subnet].end()) 
+      {
         Flit * const f = iter->second;
 
         f->atime = _time;
