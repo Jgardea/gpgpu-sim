@@ -68,7 +68,10 @@ namespace LibUtil
         return;
     }
 
-    void OptionParser::parseArguments(vector<string> argv_)
+    // to make the interaction better between booksim and dsent a vector<strin> 
+    // is used to overwrite parameters
+
+    void OptionParser::parseArguments(vector<string> argv_) // jgardea
     {
         bool is_print_options = false;
         unsigned arg_idx = 0;
@@ -87,6 +90,7 @@ namespace LibUtil
             {
                 const OptionInfo* option_info = m_option_infos_.get(option_name);
                 const String& var_name = option_info->getVarName();
+                
                 if(option_info->hasArg())
                 {
                     if((arg_idx + 1) >= argv_.size())

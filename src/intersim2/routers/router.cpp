@@ -154,7 +154,6 @@ Router *Router::NewRouter( const Configuration& config,
   const string type = config.GetStr( "router" );
   Router *r = NULL;
   if ( type == "iq" ) {
-    //r = new IQRouter( config, parent, name, id, inputs, outputs, up_arbiter, down_arbiter );
     r = new IQRouter( config, parent, name, id, inputs, outputs );
   } else if (type == "iq3d" ){
       r = new IQ3DRouter( config, parent, name, id, inputs, outputs, up_arbiter, down_arbiter );

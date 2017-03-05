@@ -6,12 +6,12 @@ num_vcs     = 16; // 4 vc channels per layer are needed to ensure the traffic of
 vc_buf_size = 8;
 
 read_request_begin_vc = 0;
-read_request_end_vc = 7;
-write_request_begin_vc = 0;
+read_request_end_vc = 3;
+write_request_begin_vc = 4;
 write_request_end_vc = 7;
 read_reply_begin_vc = 8;
-read_reply_end_vc = 15;
-write_reply_begin_vc = 8;
+read_reply_end_vc = 11;
+write_reply_begin_vc = 12;
 write_reply_end_vc = 15;
 
 wait_for_tail_credit = 0;
@@ -20,7 +20,7 @@ vc_busy_when_full = 1;
 channel_latency = 1;
 
 //zxy_reply = zxy;
-reply_rf = xzy;
+reply_rf = xyz;
 
 /////////////// Router /////////////
 
@@ -56,11 +56,14 @@ use_read_write = 1;
 write_fraction = 0.3;
 
 read_request_size  = 1; 
-write_request_size = 5; 
-read_reply_size    = 5; 
+write_request_size = 17; 
+read_reply_size    = 17; 
 write_reply_size   = 1; 
 
 packet_size = 5;
+
+flit_size = 64; 
+asym_flit_size = 192;
 
 //////////////  Stats /////////////////
 
@@ -70,20 +73,18 @@ packet_size = 5;
 
 ///////////// Network /////////////////
 
-//topology = fly;
-//k = 27;
-//n = 1;
-
 router=iq3d; // iq3d for vb-3dmesh
+//router=iq;
 
 topology = mesh3D;
 k  = 4;
 n  = 4;
 s  = 4;
 
+//subnets = 1;
 //subnets = 2;
-//subnets = 4;
-subnet_selection = 3;       // 1 = rounrobin; 2 = random
+subnets = 4;
+subnet_selection = 1;       // 1 = RR; 2 = random; 3 = by packet size
 //read_request_subnet = 0;
 //read_reply_subnet = 1;
 //write_request_subnet = 2;
@@ -92,17 +93,19 @@ subnet_selection = 3;       // 1 = rounrobin; 2 = random
 ////////////// Routing ///////////////
 
 routing_function = dor; //routefunc = topology + routing_function
-//routing_function = dest_tag;
 
 //////////// Simulation /////////////////
 
 sim_type = latency;
 
 warmup_periods = 1;
-sample_period  = 10000;
+sample_period  = 1000;
 sim_count          = 1;
 max_samples = 3;
 
 latency_thres = 500.0;
 warmup_thres = 0.05;
 seed = 0; // random seed
+
+////////// DSENT ///////////////////
+dsent_config_file = dsent/electrical-mesh.cfg;

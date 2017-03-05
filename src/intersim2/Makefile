@@ -53,6 +53,7 @@ CPPFLAGS += -O3
 endif
 CPPFLAGS += -g
 CPPFLAGS += -fPIC
+CPPFLAGS += -O3
 
 ifeq ($(SIM_OBJ_FILES_DIR),)
 OBJDIR := obj

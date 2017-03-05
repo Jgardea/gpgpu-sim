@@ -1481,6 +1481,8 @@ void IQRouter::_SWAllocEvaluate( )
   }
   
   _sw_allocator->Allocate();
+  _switchMonitor->arbitrate();  // jgardea
+
   if(_spec_sw_allocator)
     _spec_sw_allocator->Allocate();
   

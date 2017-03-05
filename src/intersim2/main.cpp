@@ -156,16 +156,14 @@ bool Simulate( BookSimConfig const & config )
 
   cout<<"Total run time "<<total_time<<endl;
 
-  for (int i=0; i<subnets; ++i) {
-
-    ///Power analysis
-    if(config.GetInt("sim_power") > 0){
-      Power_Module pnet(net[i], config);
-      pnet.run_dsent(); // jgardea
-    }
-
-    delete net[i];
+  if(config.GetInt("sim_power") > 0)
+  {
+    Power_Module pnet(net, config);
+    pnet.dsent();
   }
+
+  for (int i=0; i<subnets; ++i) 
+    delete net[i];
 
   delete trafficManager;
   trafficManager = NULL;

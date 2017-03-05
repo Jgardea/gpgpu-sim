@@ -15,7 +15,7 @@ namespace DSENT
     {
         // Initialize DSENT framework (setup log file, config file, ...)
         initialize(argv_);
-
+        
         // Build the specified model in the config file
         buildModel();
         
@@ -150,7 +150,7 @@ namespace DSENT
 
         ms_model_->construct();
         is_asymmetric = ms_model_->isAsymmetric(); 
-
+        
         // Update the model
         // Read all properties the model requires
         const vector<String>* property_names = ms_model_->getPropertyNames();

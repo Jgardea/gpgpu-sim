@@ -30,23 +30,43 @@
 #include "buffer_monitor.hpp"
 #include "switch_monitor.hpp"
 #include "iq_router.hpp"
+
+//jgardea
+#include <string>
+#include <sstream>
 #include "iq3d_router.hpp"
 #include "mesh3D.hpp"
 #include "vertical_channel.hpp"
-#include "dsent/DSENT.h"          // jgardea
-#include "libutil/String.h" // jgardea
+#include "dsent/DSENT.h"          
+#include "libutil/String.h" 
+#include "globals.hpp"
+using namespace DSENT;      
 
-using namespace DSENT;      // jgardea
+enum {_router, _channel, _ver_channel};
 
-Power_Module::Power_Module(Network * n , const Configuration &config)
+Power_Module::Power_Module(vector<Network *> n , const Configuration &config)
   : Module( 0, "power_module" ){
 
-  
+  // jgardea
+  topology = config.GetStr("topology");
+  flit_size = config.GetInt("flit_size");
+  asym_flit_size = config.GetInt("asym_flit_size");
+  assert(flit_size && asym_flit_size);
+  dsent_config_file = config.GetStr("dsent_config_file");
+  if ( gNetSelec == 3 ) asymmetric = true;
+  else asymmetric = false;
+  nets = n;
+  total_components_dynam.resize(3,0.0);
+  total_network_dynam.resize(nets.size(), 0.0);
+  total_network_leakage.resize(nets.size(), 0.0);
+  total_components_leakage.resize(3, 0.0);
+  // asymmetric networks work only with mesh3D topology
+  if (asymmetric) assert(topology == "mesh3D");
+
   string pfile = config.GetStr("tech_file");
   PowerConfig pconfig;
   pconfig.ParseFile(pfile);
-
-  net = n;
+  
   output_file_name = config.GetStr("power_output_file");
   classes = config.GetInt("classes");
   channel_width = (double)config.GetInt("channel_width");
@@ -453,7 +473,8 @@ double Power_Module:: areaOutputModule(double Outputs) {
 }
 
 void Power_Module::run(){
-  
+ 
+  net = nets[0];
   totalTime = GetSimTime();
   channelWirePower=0;
   channelClkPower=0;
@@ -493,7 +514,7 @@ void Power_Module::run(){
 
   vector<Router*> routers = net->GetRouters();
   for(size_t i = 0; i < routers.size(); i++){
-    IQ3DRouter* temp = dynamic_cast<IQ3DRouter*>(routers[i]);
+    IQRouter* temp = dynamic_cast<IQRouter*>(routers[i]);
     const BufferMonitor * bm = temp->GetBufferMonitor();
     calcBuffer(bm);
     const SwitchMonitor * sm = temp->GetSwitchMonitor();
@@ -535,30 +556,113 @@ void Power_Module::run(){
   cout<< "-----------------------------------------\n" ;
 }
 
-// jgardea DSENT
+// ==================== DSENT ======================= jgardea
 
-void Power_Module::run_dsent()
+void Power_Module::dsent()
+{
+    double total_dynamic = 0.0;
+    double total_leakage = 0.0;
+    
+    runDsent( );
+   
+    for (unsigned n = 0; n < nets.size(); n++ )
+    {
+        calcNetPower(nets[n], n);
+        total_dynamic += total_network_dynam[n];
+        total_leakage += total_network_leakage[n];
+    }
+    
+    cout << "\nTotal Router Dynamic Power:               " << total_components_dynam[_router] << endl;
+    cout << "Total Router Leakage Power:               " << total_components_leakage[_router] << endl;
+    cout << "Total Router Power:                       " << total_components_leakage[_router] + total_components_dynam[_router] << endl;
+
+    cout << "Total Channel Dynamic Power:              " << total_components_dynam[_channel] << endl;
+    cout << "Total Channel Leakage Power:              " << total_components_leakage[_channel] << endl;
+    cout << "Total Channel Power:                      " << total_components_leakage[_channel] + total_components_dynam[_channel] << endl;
+
+    cout << "Total Vertical Channel Dynamic Power:     " << total_components_dynam[_ver_channel] << endl;
+    cout << "Total Vertical Channel Leakage Power:     " << total_components_leakage[_ver_channel] << endl;
+    cout << "Total Vertical Channel Power:             " << total_components_leakage[_ver_channel] + total_components_dynam[_ver_channel] << endl;
+
+    cout << "Total Dynamic Power:                      " << total_dynamic << endl;
+    cout << "Total Leakage Power:                      " << total_leakage << endl;
+    cout << "Total Interconnect Power:                 " << total_dynamic + total_leakage << endl;
+}
+
+void Power_Module::runDsent( )
+{
+    
+    vector<string> config_dsent; 
+    config_dsent.push_back("-cfg");
+    config_dsent.push_back(dsent_config_file);
+    config_dsent.push_back("-overwrite");
+    string overwrite;
+    
+    stringstream convert;
+    
+    convert << flit_size;
+    string flit_sz = "NumberBitsPerFlit=" + convert.str() + "; ";
+    convert.str("");
+
+    string ver_bus = "VerticalBus=";
+    if (topology == "mesh3D") ver_bus += "true; ";
+    else ver_bus += "false; ";
+    
+    string asym_net = "AsymmetricNetwork=";
+    if ( asymmetric )
+    {
+        asym_net += "true; ";
+        convert << asym_flit_size;
+        string asym_flit_sz = "NumberBitsPerFlitAsym=" + convert.str() + "; ";
+        overwrite += asym_flit_sz;
+    }
+    else asym_net += "false; ";
+    
+    overwrite += flit_sz + asym_net + ver_bus; 
+    config_dsent.push_back(overwrite);
+
+    cout << "\nDSENT Overwrite: " << config_dsent[config_dsent.size()-1] << endl << endl;
+    energy_results = DSENT::DSENT::run(config_dsent);
+}
+
+void Power_Module::calcNetPower(Network *net, int index)
 {
 #ifdef ALLOW_DSENT
+
+    // Variables for hydbrid mesh topology
+    Mesh3D* net_mesh3d;
+    vector<VerticalChannel *> ver_chan;
+    vector<int> verchan_activity;
+    int verchan_sum = 0;
+
     totalTime = GetSimTime();
    
-    Mesh3D* net_mesh3d = (Mesh3D*) net;    
+// =======================
+    if (topology == "mesh3D")
+    {
+        net_mesh3d = (Mesh3D*) net; //TODO veticalnet_mesh3d = (Mesh3D*) net; //TODO vetical
+        ver_chan = net_mesh3d->GetVerticalChannels(); //TODO vetical
+        verchan_activity.resize(ver_chan.size(), 0); //TODO vertical
 
-    vector<FlitChannel *> inject = net_mesh3d->GetInject();
-    vector<FlitChannel *> eject = net_mesh3d->GetEject();
-    vector<FlitChannel *> chan = net_mesh3d->GetChannels();
-    vector<VerticalChannel *> ver_chan = net_mesh3d->GetVerticalChannels(); // jgardea
+        for(unsigned i = 0; i < ver_chan.size(); i++)
+        {
+            verchan_activity.push_back(ver_chan[i]->GetActivity()[0]);
+            verchan_sum += ver_chan[i]->GetActivity()[0];
+        }
+    }
+// ================ Calculating Channel Values =====================
+    vector<FlitChannel *> inject = net->GetInject();
+    vector<FlitChannel *> eject = net->GetEject();
+    vector<FlitChannel *> chan = net->GetChannels();
     
     vector<int> inject_activity(inject.size(),0);
     vector<int> eject_activity(eject.size(), 0);
     vector<int> channel_activity(chan.size(), 0);
-    vector<int> verchan_activity(ver_chan.size(), 0);
-
+    
     int inject_sum = 0;
     int eject_sum = 0;
     int chan_sum = 0;
-    int verchan_sum = 0;
-
+    
     // We are accessing class 0 under the assumption we are only using one class
      
     for(unsigned i = 0; i < inject.size(); i++)
@@ -576,14 +680,11 @@ void Power_Module::run_dsent()
         channel_activity.push_back(chan[i]->GetActivity()[0]);
         chan_sum += chan[i]->GetActivity()[0];
     }
-    for(unsigned i = 0; i < ver_chan.size(); i++)
-    {
-        verchan_activity.push_back(ver_chan[i]->GetActivity()[0]);
-        verchan_sum += ver_chan[i]->GetActivity()[0];
-    }
+    
+// ================ Calculating Router Values =====================
 
-    vector<Router*> routers = net_mesh3d->GetRouters();
-    //vector< vector< vector<int> > > router_events;
+    vector<Router*> routers = net->GetRouters();
+
     // having the data saved here might be useful for late stats
     vector< int > router_writes(routers.size(), 0);     // buffer reads for each router
     vector< int > router_reads(routers.size(), 0);      // buffer writes for each router
@@ -601,20 +702,20 @@ void Power_Module::run_dsent()
     long total_arbitrations = 0;
 
     int inputs;
+   
+    const BufferMonitor * buffermonitor = NULL;
+    const SwitchMonitor * switchmonitor = NULL;
 
-    for(size_t i = 0; i < routers.size(); i++){
-        
-        IQ3DRouter* temp = dynamic_cast<IQ3DRouter*>(routers[i]);
-        
-        const BufferMonitor * buffermonitor = temp->GetBufferMonitor();
-        const SwitchMonitor * switchmonitor = temp->GetSwitchMonitor();
+    for(size_t i = 0; i < routers.size(); i++)
+    {
+        getMonitors(switchmonitor, buffermonitor, routers[i]);
+        assert(buffermonitor && switchmonitor);
 
         // Gathering buffer monitor stats
-
         inputs = buffermonitor->NumInputs();
         writes = buffermonitor->GetWrites();
         reads = buffermonitor->GetReads();
-        
+
         for ( int j = 0; j < inputs; j++ )
         {
             router_writes[i] += writes[j];
@@ -624,70 +725,18 @@ void Power_Module::run_dsent()
         }
 
         // Gathering switch monitor stats
-
         router_arbitrations[i] = switchmonitor->GetArbitration(); 
         total_arbitrations += switchmonitor->GetArbitration();
         traversals = switchmonitor->GetActivity();
-
+        
         for ( int j = 0; j < (switchmonitor->NumOutputs() * switchmonitor->NumInputs()); j++ )
         {
             router_traversals[i] += traversals[j];
             total_traversals += traversals[j];
         }
     }
-
-    vector<string> config_dsent;
-    config_dsent.push_back("-cfg");
-    config_dsent.push_back("dsent/electrical-mesh.cfg");
     
-    vector< pair<String, vector<pair<String, double> > > > energy_results;
-    energy_results = DSENT::DSENT::run(config_dsent);
-
-    double write_energy;
-    double read_energy;
-    double traversal_energy;
-    double arb1_energy;
-    double arb2_energy;
-    double channel_energy;
-    double ver_channel_energy;
-
-    double router_leakage;
-    double channel_leakage;
-    double ver_channel_leakage;
-
-    vector<pair<String, double> > events;
-    double event;
-
-    for ( unsigned i = 0; i < energy_results.size(); i ++ )
-    {
-        events = energy_results[i].second;
-        for ( unsigned j = 0; j < events.size(); j++ )
-        {
-            event = events[j].second;
-            if (events[j].first == "Send")
-            {
-                if (energy_results[i].first == "Link") channel_energy = event;
-                else ver_channel_energy = event;
-            }
-            if (events[j].first == "WriteBuffer") write_energy = event;
-            if (events[j].first == "ReadBuffer") read_energy = event;
-            if (events[j].first == "TraverseCrossbar->Multicast1") traversal_energy = event;
-            if (events[j].first == "ArbitrateSwitch->ArbitrateStage1") arb1_energy = event;
-            if (events[j].first == "ArbitrateSwitch->ArbitrateStage2") arb2_energy = event;
-            if (events[j].first == "Leakage")
-            {
-                if (energy_results[i].first == "MeshRouter") router_leakage = event;
-                else if (energy_results[i].first == "Link") channel_leakage = event;
-                else if (energy_results[i].first == "VerticalLink") ver_channel_leakage = event;
-            }
-                
-        }
-    }
-
-    cout << "Vertical Channel Energy: " << ver_channel_energy << endl;
-    cout << "Channel Energy: " << channel_energy << endl;
-    cout << "Router Leakge: " << router_leakage << endl;
-    cout << endl;
+    calcEnergy(asymmetric && index); // get the values from dsent resul
 
     cout << "Writes: " << total_writes <<  endl;
     cout << "Reads: " << total_reads << endl;
@@ -704,8 +753,10 @@ void Power_Module::run_dsent()
     double traversal_power = (total_traversals/totalTime) * traversal_energy * fCLK;
     double arb1_power = (total_arbitrations/totalTime) * arb1_energy * fCLK;
     double arb2_power = (total_arbitrations/totalTime) * arb2_energy * fCLK;
+    
     double channel_power = ((eject_sum + inject_sum + chan_sum)/totalTime) * channel_energy * fCLK ;
     double ver_channel_power = (verchan_sum/totalTime) * ver_channel_energy * fCLK;
+    double router_power = write_power + read_power + traversal_power + arb1_power + arb2_power;
 
     int horizontal_channels = inject.size() + eject.size() + chan.size();
     int vertical_channels = ver_chan.size();
@@ -713,21 +764,39 @@ void Power_Module::run_dsent()
     channel_leakage *= horizontal_channels;
     ver_channel_leakage *= vertical_channels;
     router_leakage *= routers.size();
-
-    double router_power = write_power + read_power + traversal_power + arb1_power + arb2_power;
-
-    double totalpower = router_power + channel_power + ver_channel_power + router_leakage + channel_leakage + ver_channel_leakage;
     
+    double total_dynamic = router_power + channel_power + ver_channel_power;
+    double total_leakage = router_leakage + channel_leakage + ver_channel_leakage;
+    double totalpower = total_dynamic + total_leakage;
+
+    int net_flit_size;
+    if (asymmetric && index == 1) net_flit_size = asym_flit_size;
+    else net_flit_size = flit_size;
+
+    // Network Total values update
+    total_components_dynam[_router] += router_power;
+    total_components_dynam[_channel] += channel_power;
+    total_components_dynam[_ver_channel] += ver_channel_power;
+    total_components_leakage[_router] += router_leakage;
+    total_components_leakage[_channel] += channel_leakage;
+    total_components_leakage[_ver_channel] += ver_channel_leakage;
+
+    total_network_dynam[index] = total_dynamic;
+    total_network_leakage[index] = total_leakage; 
+
+    // Subnetwork values display
     cout<< "\n-----------------------------------------\n" ;
-    cout<< "- OCN Power Summary\n\n" ;
+    cout<< "- Subnet " << index << " Power Summary\n\n" ;
     cout<< "- Completion Time:                  "<<totalTime <<"\n" ;
-    cout<< "- Flit Widths:                      "<<channel_width <<"\n\n" ;
+    cout<< "- Flit Widths:                      "<< net_flit_size <<"\n\n" ;
 
-    cout<< "- Channel Wire Power:               "<< channel_power <<"\n" ;
-    cout<< "- Channel Leakage Power:            "<< channel_leakage <<"\n\n" ;
+    cout<< "- Channel Dynamic Power:            "<< channel_power <<"\n" ;
+    cout<< "- Channel Leakage Power:            "<< channel_leakage <<"\n" ;
+    cout<< "- Channel Power:                    "<< channel_power + channel_leakage <<"\n\n";
 
-    cout<< "- Vertical Channel Wire Power:      "<< ver_channel_power <<"\n" ;
-    cout<< "- Vertical Channel Leakage Power:   "<< ver_channel_leakage <<"\n\n" ;
+    cout<< "- Vertical Channel Dynamic Power:   "<< ver_channel_power <<"\n" ;
+    cout<< "- Vertical Channel Leakage Power:   "<< ver_channel_leakage <<"\n" ;
+    cout<< "- Vertical Channel Power:           "<< ver_channel_power + ver_channel_leakage <<"\n\n";
 
     cout<< "- Input Read Power:                 "<< read_power <<"\n";
     cout<< "- Input Write Power:                "<< write_power <<"\n";
@@ -735,13 +804,110 @@ void Power_Module::run_dsent()
     cout<< "- Switch Arbitration1 Power:        "<< arb1_power <<"\n" ; 
     cout<< "- Switch Arbitration2 Power:        "<< arb2_power <<"\n" ;
     cout<< "- Switch Power:                     "<< traversal_power + arb1_power + arb2_power <<"\n";
-    cout<< "- Router Power:                     "<< router_power <<"\n";
+    cout<< "- Router Dynamic Power:             "<< router_power <<"\n";
     cout<< "- Router Leakage Power:             "<< router_leakage <<"\n\n";
     
-    cout<< "- Total Dynamic Power:              "<< router_power + channel_power + ver_channel_power << "\n";
-    cout<< "- Total Leakage Power:              "<< router_leakage + channel_leakage + ver_channel_leakage << "\n\n";
+    cout<< "- Total Dynamic Power:              "<< total_dynamic << "\n";
+    cout<< "- Total Leakage Power:              "<< total_leakage << "\n\n";
 
     cout<< "- Total Power:                      "<<totalpower <<"\n";
-    cout<< "-----------------------------------------\n" ;
+    cout<< "-----------------------------------------\n";
+#else
+    cout << "DSENT has not been included in this build of booksim. Please check booksim Makfile" << endl;
 #endif
+}
+
+void Power_Module::getMonitors(const SwitchMonitor * &sm, const BufferMonitor * &bm, Router* router)
+{
+    if(topology == "mesh3D")
+    {
+        IQ3DRouter* iq3d_router = dynamic_cast<IQ3DRouter*>(router);
+        bm = iq3d_router->GetBufferMonitor();
+        sm = iq3d_router->GetSwitchMonitor();
+    }
+    else 
+    {
+        IQRouter* iq_router = dynamic_cast<IQRouter*>(router);
+        bm = iq_router->GetBufferMonitor();
+        sm = iq_router->GetSwitchMonitor();
+    }
+    assert(bm && sm);
+}
+
+void Power_Module::calcEnergy(bool asymmetric )
+{
+    write_energy = 0.0;
+    read_energy = 0.0;
+    traversal_energy = 0.0;
+    arb1_energy = 0.0;
+    arb2_energy = 0.0;
+    channel_energy = 0.0;
+    ver_channel_energy = 0.0;
+
+    router_leakage = 0.0;
+    channel_leakage = 0.0;
+    ver_channel_leakage = 0.0;
+
+    vector<pair<String, double> > events;
+    double event;
+    string component;
+
+    if (asymmetric)
+    {
+        for ( unsigned i = 0; i < energy_results.size(); i ++ )
+        {
+            component = energy_results[i].first;
+            if ( component.find("Asym") == string::npos ) continue;
+            
+            events = energy_results[i].second;
+            for ( unsigned j = 0; j < events.size(); j++ )
+            {
+                event = events[j].second;
+                if (events[j].first == "Send")
+                {
+                    if (energy_results[i].first == "AsymLink") channel_energy = event;
+                    else ver_channel_energy = event;
+                }
+                if (events[j].first == "WriteBuffer")  write_energy = event;
+                if (events[j].first == "ReadBuffer") read_energy = event;
+                if (events[j].first == "TraverseCrossbar->Multicast1") traversal_energy = event;
+                if (events[j].first == "ArbitrateSwitch->ArbitrateStage1") arb1_energy = event;
+                if (events[j].first == "ArbitrateSwitch->ArbitrateStage2") arb2_energy = event;
+                if (events[j].first == "Leakage")
+                {
+                    if (energy_results[i].first == "AsymMeshRouter") router_leakage = event;
+                    else if (energy_results[i].first == "AsymLink") channel_leakage = event;
+                    else if (energy_results[i].first == "AsymVerticalLink") ver_channel_leakage = event;
+                }
+                    
+            }
+        }
+    }else
+    {
+        for ( unsigned i = 0; i < energy_results.size(); i ++ )
+        {
+            events = energy_results[i].second;
+            for ( unsigned j = 0; j < events.size(); j++ )
+            {
+                event = events[j].second;
+                if (events[j].first == "Send")
+                {
+                    if (energy_results[i].first == "Link") channel_energy = event;
+                    else ver_channel_energy = event;
+                }
+                if (events[j].first == "WriteBuffer") write_energy = event;
+                if (events[j].first == "ReadBuffer") read_energy = event;
+                if (events[j].first == "TraverseCrossbar->Multicast1") traversal_energy = event;
+                if (events[j].first == "ArbitrateSwitch->ArbitrateStage1") arb1_energy = event;
+                if (events[j].first == "ArbitrateSwitch->ArbitrateStage2") arb2_energy = event;
+                if (events[j].first == "Leakage")
+                {
+                    if (energy_results[i].first == "MeshRouter") router_leakage = event;
+                    else if (energy_results[i].first == "Link") channel_leakage = event;
+                    else if (energy_results[i].first == "VerticalLink") ver_channel_leakage = event;
+                }
+                    
+            }
+        }
+    }
 }

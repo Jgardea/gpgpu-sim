@@ -81,9 +81,9 @@ namespace DSENT
         const String& link_wire_spacing_multiplier = getParameter("Link->WireSpacingMultiplier");
         unsigned  router_ports = getParameter("Router->NumberPorts").toUInt();
 
-        //getGenProperties()->set("NumberRouters", 1);
-        //getGenProperties()->set("NumberLinks", 1);
-        //getGenProperties()->set("NumberRouterToSiteLinks", 1);
+        getGenProperties()->set("NumberRouters", 1);
+        getGenProperties()->set("NumberLinks", 1);
+        getGenProperties()->set("NumberRouterToSiteLinks", 1);
         getGenProperties()->set("Router->NumberInputPorts", router_ports );
         getGenProperties()->set("Router->NumberOutputPorts", router_ports );
 

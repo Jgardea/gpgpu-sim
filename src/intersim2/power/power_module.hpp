@@ -29,13 +29,15 @@
 #define _POWER_MODULE_HPP_
 
 #include <map>
-
+#include <vector>
 #include "module.hpp"
 #include "network.hpp"
 #include "config_utils.hpp"
 #include "flitchannel.hpp"
 #include "switch_monitor.hpp"
 #include "buffer_monitor.hpp"
+
+#include "libutil/String.h"
 
 struct wire{
   double L;
@@ -49,6 +51,30 @@ class Power_Module : public Module {
 protected:
   //network undersimulation
   Network * net;
+  
+  // jgardea 
+  vector<Network *> nets;  
+  vector<double> total_components_dynam;
+  vector<double> total_components_leakage;
+  vector<double> total_network_dynam;
+  vector<double> total_network_leakage;
+  string dsent_config_file;
+  bool asymmetric;
+  int flit_size;
+  int asym_flit_size;
+  vector< pair<LibUtil::String, vector<pair<LibUtil::String, double> > > > energy_results;
+  // energy results
+  double write_energy;
+  double read_energy;
+  double traversal_energy;
+  double arb1_energy;
+  double arb2_energy;
+  double channel_energy;
+  double ver_channel_energy;
+  double router_leakage;
+  double channel_leakage;
+  double ver_channel_leakage;
+
   int classes;
   //all channels are this width
   double channel_width;
@@ -65,6 +91,8 @@ protected:
   //store the property of wires based on length
   map<double, wire> wire_map;
 
+  string topology;
+    
   //////////////////////////////////Constants/////////////////////////////
   //wire length in (mm)
   double wire_length;
@@ -144,6 +172,12 @@ protected:
 
   ////////////////////////
 
+  //DSENT                               jgardea
+  void runDsent( ); 
+  void getMonitors(const SwitchMonitor * &sm, const BufferMonitor * &bm, Router* router);
+  void calcEnergy(bool asym );
+  void calcNetPower(Network* net, int index);
+
   //channels
   void calcChannel(const FlitChannel * f);
   wire const & wireOptimize(double l);
@@ -176,11 +210,11 @@ protected:
   double areaOutputModule(double Outputs);
 
 public:
-  Power_Module(Network * net, const Configuration &config);
+  Power_Module(vector<Network *> net, const Configuration &config);
   ~Power_Module();
 
   void run();
-  void run_dsent(); // jgardea
+  void dsent(); // jgardea
 
 
 };

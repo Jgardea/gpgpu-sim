@@ -75,8 +75,8 @@ BookSimConfig::BookSimConfig( )
 
   //==== Single-node options ===============================
 
-  _int_map["in_ports"]  = 5;
-  _int_map["out_ports"] = 5;
+  _int_map["in_ports"]  = 7;
+  _int_map["out_ports"] = 7;
 
   //========================================================
   // Router options
@@ -187,6 +187,11 @@ BookSimConfig::BookSimConfig( )
   // number of flits per packet
   _int_map["packet_size"] = 1;
   AddStrField("packet_size", ""); // workaraound to allow for vector specification
+
+  // flit size jgardea
+
+  _int_map["flit_size"] = 64;
+  _int_map["asym_flit_size"] = 192; //default for asymmetric networks
 
   // if multiple values are specified per class, set probabilities for each
   _int_map["packet_size_rate"] = 1;
@@ -323,6 +328,8 @@ BookSimConfig::BookSimConfig( )
   _int_map["sim_power"] = 1;
   AddStrField("power_output_file","results/power_results"); // TODO Do I need this ?
   AddStrField("tech_file", "power/techfile.txt");
+  AddStrField("dsent_config_file", ""); // jgardea
+
   _int_map["channel_width"] = 128;
   _int_map["channel_sweep"] = 0;
 
