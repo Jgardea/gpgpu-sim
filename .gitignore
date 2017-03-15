@@ -11,9 +11,9 @@ libcuda/cuobjdump_parser.c
 libcuda/cuobjdump_parser.h
 libcuda/cuobjdump_parser.output
 
-/home/kaya1/jgardea/GPGPU-SIM/gpgpu-sim/src/f
+src/f
 src/intersim2/f
-/home/kaya1/jgardea/GPGPU-SIM/gpgpu-sim/f
+f
 
 lib/*
 
