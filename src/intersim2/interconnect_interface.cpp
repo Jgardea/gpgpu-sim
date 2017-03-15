@@ -68,12 +68,15 @@ InterconnectInterface::InterconnectInterface()
 
 InterconnectInterface::~InterconnectInterface() // TODO get dsent to go thtrough here
 {
+  
+  //jgardea DSENT power module
+  if ( _icnt_config->GetInt("sim_power") > 0 )
+  {
+      Power_Module pnet(_net, *_icnt_config);
+      pnet.dsent();
+  }
+
   for (int i=0; i<_subnets; ++i) {
-    ///Power analysis
-    if(_icnt_config->GetInt("sim_power") > 0){
-      Power_Module pnet(_net[i], *_icnt_config);
-      pnet.run();
-    }
     delete _net[i];
   }
 

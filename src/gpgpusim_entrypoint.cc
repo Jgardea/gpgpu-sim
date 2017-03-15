@@ -41,8 +41,6 @@
 
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-
-
 struct gpgpu_ptx_sim_arg *grid_params;
 
 sem_t g_sim_signal_start;
@@ -55,12 +53,8 @@ gpgpu_sim_config g_the_gpu_config;
 gpgpu_sim *g_the_gpu;
 stream_manager *g_stream_manager;
 
-
-
 static int sg_argc = 3;
 static const char *sg_argv[] = {"", "-config","gpgpusim.config"};
-
-
 
 static void print_simulation_time();
 
