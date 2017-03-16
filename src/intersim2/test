@@ -55,14 +55,14 @@ use_read_write = 1;
 
 write_fraction = 0.3;
 
-read_request_size  = 1; 
-write_request_size = 17; 
-read_reply_size    = 17; 
-write_reply_size   = 1; 
+read_request_size  = 1;
+write_reply_size   = 1;
+write_request_size = 5; 
+read_reply_size    = 5; 
 
 packet_size = 5;
 
-flit_size = 64; 
+flit_size = 256;
 asym_flit_size = 192;
 
 //////////////  Stats /////////////////
@@ -81,14 +81,10 @@ k  = 4;
 n  = 4;
 s  = 4;
 
-//subnets = 1;
+subnets = 1;
 //subnets = 2;
-subnets = 4;
+//subnets = 4;
 subnet_selection = 1;       // 1 = RR; 2 = random; 3 = by packet size
-//read_request_subnet = 0;
-//read_reply_subnet = 1;
-//write_request_subnet = 2;
-//write_reply_subnet = 3;
 
 ////////////// Routing ///////////////
 
