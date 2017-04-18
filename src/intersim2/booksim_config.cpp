@@ -327,8 +327,10 @@ BookSimConfig::BookSimConfig( )
   //==================Power model params=====================
   _int_map["sim_power"] = 1;
   AddStrField("power_output_file","results/power_results"); // TODO Do I need this ?
-  AddStrField("tech_file", "power/techfile.txt");
+  AddStrField("tech_file", "/home/kaya1/jgardea/GPGPU-SIM/gpgpu-sim/src/intersim2/power/techfile.txt");
   AddStrField("dsent_config_file", ""); // jgardea
+
+  AddStrField("frequency", "1"); // interconnect frequency in GHZs  	jgardea
 
   _int_map["channel_width"] = 128;
   _int_map["channel_sweep"] = 0;
@@ -339,7 +341,6 @@ BookSimConfig::BookSimConfig( )
 
 PowerConfig::PowerConfig( )
 { 
-
   _int_map["H_INVD2"] = 0;
   _int_map["W_INVD2"] = 0;
   _int_map["H_DFQD1"] = 0;

@@ -6,6 +6,7 @@
 
 namespace DSENT
 {
+	const double PI = 3.14159265358979323846;
     TechModel::TechModel()
         : Config(), m_std_cell_lib_(NULL), m_available_wire_layers_(NULL)
     {}
@@ -246,6 +247,87 @@ namespace DSENT
     }
     //-------------------------------------------------------------------------
 
+	//-------------------------------------------------------------------------
+    // TSV related Functions 
+    //-------------------------------------------------------------------------
+
+	double TechModel::calculateBumpCapacitance( double bump_radius_, double tsv_radius_ ) const
+	{
+		ASSERT(bump_radius_ > tsv_radius_, "[Error], Bump Diameter must be greater than TSV Diamter");
+		double wire_dielec_const = get("Wire->Global->DielectricConstant").toDouble();
+		double wire_metal_thickness = get("Wire->Global->MetalThickness").toDouble();
+		double dielec_thickness = get("TSV->DielectricThickness").toDouble();
+		double diff = pow(bump_radius_,2) - pow(tsv_radius_ + dielec_thickness,2);
+
+		double cap_bump = wire_dielec_const * 8.85e-12 * ((PI * diff) / wire_metal_thickness );
+		cout << "C_bump: " << cap_bump << endl;
+		return cap_bump;
+	}
+
+	double TechModel::calculateSiliconResistance( double pitch_, double diameter_, double height_) const
+	{
+		double si_resistivity = get ("TSV->SiliconResistivity").toDouble();
+		double si_res = si_resistivity * (acosh(pitch_/diameter_) / (PI * height_) );
+		//cout << "TSV| R_Si: " << si_res;
+		return si_res;
+	}
+	
+	double TechModel::calculateSiliconCapacitance( double length_, double pitch_, double diameter_) const
+	{
+		double si_dielec_const = get("TSV->SiliconDielecConst").toDouble();
+		double cap_si = si_dielec_const * 8.85e-12 * ((length_*PI) / acosh(pitch_ / diameter_));
+		//cout << " | C_Si: " << cap_si << endl;
+		return cap_si;
+	}
+
+	double TechModel::calculateTSVResistance( double si_res_, double si_cap_, double radius_, double length_, double freq_ ) const
+	{
+		double resistivity = get("TSV->Resistivity").toDouble(); 
+		double radius_sqr = radius_ * radius_; 
+		double cross_section = radius_sqr * PI;
+		double skin = calculateSkin(freq_);
+
+		if ( skin > radius_) skin = radius_; // skin effect happens when skin < radius 
+
+		double part1 = length_/cross_section;
+		double part2 = length_/( PI * ( radius_sqr - std::pow(radius_ - skin, 2) ) );
+		double resistance = resistivity * sqrt(std::pow(part1,2) + std::pow(part2,2));
+
+		//cout << "TSV | part1: " << part1 << " | part2: " << part2 << endl;
+		cout << "TSV | R_TSV: " << resistance << endl;
+
+		return resistance;
+	}
+
+	double TechModel::calculateTSVCapacitance(double si_res_, double si_cap_, double radius_, double height_, double freq_) const
+	{
+		double dielec_const = get("TSV->DielectricConstant").toDouble();
+		double dielec_thickness = get("TSV->DielectricThickness").toDouble();
+
+		double cap_ox = dielec_const * 8.85e-12 * ((2 * PI * height_) / log((radius_ + dielec_thickness) / radius_));
+		double inv_si_res2 = (1/si_res_);
+		inv_si_res2 *= inv_si_res2;
+		double angular_freq2 = 2 * PI * freq_;
+		angular_freq2 *= angular_freq2;
+
+		double cap_eq =  (cap_ox * (inv_si_res2 + (si_cap_ * angular_freq2 * (si_cap_ + cap_ox))) ) / 
+						(inv_si_res2 + (angular_freq2 * pow(si_cap_ + cap_ox, 2)));
+	
+		cout << "TSV | C_ox: " << cap_ox << endl;
+		cout << "TSV | Cap: " << cap_eq << endl;
+		
+		return cap_eq;
+	}
+
+	double TechModel::calculateSkin(double frequency ) const
+	{
+		double permeability = get("TSV->Permeability").toDouble();
+		double conductivity = 1 / get("TSV->Resistivity").toDouble();
+		double temp = permeability * conductivity * frequency * PI;
+		return (1 / sqrt(temp));
+	}
+	// -----------------------------------------------------------------------
+
     //-------------------------------------------------------------------------
     // Wire Related Functions
     //-------------------------------------------------------------------------
@@ -295,20 +377,33 @@ namespace DSENT
     {
         // Get technology parameter
         double min_width = get("Wire->" + layer_name_ + "->MinWidth");
-        //double barrier_thickness = get("Wire->" + layer_name_ + "->BarrierThickness");
         double resistivity = get("Wire->" + layer_name_ + "->Resistivity");
         double metal_thickness = get("Wire->" + layer_name_ + "->MetalThickness");
 
         ASSERT(width_ >= min_width, "[Error] Wire width must be >= " + (String) min_width + "!");
         ASSERT(length_ >= 0, "[Error] Wire length must be >= 0!");
 
-        // Calculate Rho
-        // double rho = 2.202e-8 + (1.030e-15 / (width_ - 2.0 * barrier_thickness));
-
         double unit_res = resistivity / (width_ * metal_thickness);
-        //double unit_res = rho / ((width_ - 2.0 * barrier_thickness) * (metal_thickness - barrier_thickness));
-
         double total_res = unit_res * length_;
+
+		/*Frequency dependant Resistance */
+		//if ( freq_ )
+		//{
+		//	double permeability = get("TSV->Permeability").toDouble();
+		//	double metal_thickness = get("Wire->" + layer_name_ + "->MetalThickness");
+		//	double skin = sqrt(resistivity / (PI * freq_ * permeability));
+		//	double r_ac; 
+		//	if ( skin > metal_thickness ) r_ac = resistivity / (width_ * metal_thickness);
+		//	else r_ac = resistivity / (width_ * skin);
+		//	r_ac *= 1e-3;
+		//	double dc_res = total_res * 1e-3;
+		//	//double r_ac = (length_ * sqrt(resistivity * PI * permeability * freq_)) / width_;
+
+		//	double resistance = sqrt(pow(dc_res,2) + pow(r_ac,2));
+		//	cout  <<"Wire | skin: " << skin << " | metal_thick: " << metal_thickness << endl;
+		//	cout << "Wire | R_ac: " << r_ac << endl;
+		//	cout << "Wire | Freq_Res: " << resistance << endl;
+		//}
         return total_res;
     }
     //-------------------------------------------------------------------------

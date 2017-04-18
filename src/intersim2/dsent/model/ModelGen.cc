@@ -29,6 +29,7 @@
 #include "electrical/Router.h"
 #include "electrical/RepeatedLink.h"
 #include "electrical/BroadcastHTree.h"
+#include "electrical/TSV.h"					  // jgardea
 // Networks
 #include "model/BSElectricalMesh.h"           //jgardea
 #include "model/ElectricalMesh.h"
@@ -140,6 +141,10 @@ namespace DSENT
         {
             return new ElectricalMesh(instance_name_, tech_model_);
         }
+		else if("TSV" == model_name_)
+		{
+			return new TSV(instance_name_, tech_model_);			// jgardea
+		}
         else if("BSElectricalMesh" == model_name_ )                  // jgardea
         {
             return new BSElectricalMesh(instance_name_, tech_model_);

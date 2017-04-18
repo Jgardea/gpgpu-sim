@@ -43,4 +43,4 @@ $(TARGET): main.o DSENT.o  $(OBJS)
 .phony: clean
 clean:
 	$(RM) -rf main.o DSENT.o $(OBJS) $(TARGET)
-	$(MAKE) -C $(CURDIR)/libutil clean
+#	$(MAKE) -C $(CURDIR)/libutil clean

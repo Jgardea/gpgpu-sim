@@ -1,4 +1,4 @@
-#include "electrical/RepeatedLink.h"
+#include "electrical/TSV.h"
 
 #include "model/PortInfo.h"
 #include "model/EventInfo.h"
@@ -14,78 +14,53 @@
 
 namespace DSENT
 {
-    RepeatedLink::RepeatedLink(const String& instance_name_, const TechModel* tech_model_)
-        : ElectricalModel(instance_name_, tech_model_)
+    TSV::TSV(const String& instance_name_, const TechModel* tech_model_)
+        : RepeatedLink(instance_name_, tech_model_)
     {
-        m_repeater_ = NULL;
-        m_repeater_load_ = NULL;
-        m_timing_tree_ = NULL;
-
+		m_repeater_ = NULL;
+		m_repeater_load_ = NULL;
+		m_timing_tree_ = NULL;
         initParameters();
         initProperties();
     }
 
-    RepeatedLink::~RepeatedLink()
+    TSV::~TSV()
     {
         delete m_repeater_;
         delete m_repeater_load_;
         delete m_timing_tree_;
     }
 
-    void RepeatedLink::initParameters()
+    void TSV::initParameters()
     {
-        addParameterName("NumberBits");
-        addParameterName("WireLayer");
-        addParameterName("WireWidthMultiplier", 1.0);
-        addParameterName("WireSpacingMultiplier", 1.0);
+        addParameterName("WireLayer", "Vertical");
+		addParameterName("Frequency");
         return;
     }
 
-    void RepeatedLink::initProperties()
+    void TSV::initProperties()
     {
-        addPropertyName("WireLength");
-        addPropertyName("Delay");
-		addPropertyName("IsKeepParity", "FALSE");
+		addPropertyName("WireLength",0);
+        addPropertyName("Length");
+		addPropertyName("Diameter");
+		addPropertyName("Pitch");
+		addPropertyName("BumpDiameter");
         return;
     }
 
-    RepeatedLink* RepeatedLink::clone() const
+    TSV* TSV::clone() const
     {
         // TODO
         return NULL;
     }
 
-    void RepeatedLink::constructModel()
+    void TSV::constructModel()
     {
         // Get parameters
         unsigned int number_bits = getParameter("NumberBits").toUInt();
-        const String& wire_layer = getParameter("WireLayer");
-        double wire_width_multiplier = getParameter("WireWidthMultiplier").toDouble();
-        double wire_spacing_multiplier = getParameter("WireSpacingMultiplier").toDouble();
 
         ASSERT(number_bits > 0, "[Error] " + getInstanceName() + 
                 " -> Number of bits must be > 0!");
-        ASSERT(getTechModel()->isWireLayerExist(wire_layer), "[Error] " + getInstanceName() + 
-                " -> Wire layer does not exist!");
-        ASSERT(wire_width_multiplier >= 1.0, "[Error] " + getInstanceName() + 
-                " -> Wire width multiplier must be >= 1.0!");
-        ASSERT(wire_spacing_multiplier >= 1.0, "[Error] " + getInstanceName() +
-                " -> Wire spacing multiplier must be >= 1.0!");
-
-        double wire_min_width = getTechModel()->get("Wire->" + wire_layer + "->MinWidth").toDouble();
-        double wire_min_spacing = getTechModel()->get("Wire->" + wire_layer + "->MinSpacing").toDouble();
-
-        double wire_width = wire_min_width * wire_width_multiplier;
-        double wire_spacing = wire_min_spacing * wire_spacing_multiplier;
-		
-		cout << endl;
-        double wire_cap_per_len = getTechModel()->calculateWireCapacitance(wire_layer, wire_width, wire_spacing, 1.0);
-        double wire_res_per_len = getTechModel()->calculateWireResistance(wire_layer, wire_width, 1.0);
-
-        getGenProperties()->set("WireWidth", wire_width);
-        getGenProperties()->set("WireSpacing", wire_spacing);
-        getGenProperties()->set("WireCapacitancePerLength", wire_cap_per_len);
-        getGenProperties()->set("WireResistancePerLength", wire_res_per_len);
 
         // Create ports
         createInputPort("In", makeNetIndex(0, number_bits-1));
@@ -125,34 +100,46 @@ namespace DSENT
         // is added
         m_repeater_->getNet("Y")->addDownstreamNode(m_repeater_load_);
         // Init a timing object to calculate delay
-        m_timing_tree_ = new ElectricalTimingTree("RepeatedLink", this);
+        m_timing_tree_ = new ElectricalTimingTree("TSV", this);
         m_timing_tree_->performCritPathExtract(m_repeater_->getNet("A"));
         return;
     }
 
-    void RepeatedLink::updateModel()
+    void TSV::updateModel()
     {
         unsigned int number_bits = getParameter("NumberBits").toUInt();
+		double freq = getParameter("Frequency");
 
         // Get properties
-        double wire_length = getProperty("WireLength").toDouble();
+		double tsv_length = getProperty("Length").toDouble();
+		double tsv_diameter = getProperty("Diameter").toDouble();
+		double tsv_pitch = getProperty("Pitch").toDouble();
+		double bump_diameter = getProperty("BumpDiameter").toDouble();
         double required_delay = getProperty("Delay").toDouble();
         bool isKeepParity = getProperty("IsKeepParity").toBool();
 
-        ASSERT(wire_length >= 0, "[Error] " + getInstanceName() +
-                " -> Wire length must be >= 0!");
+		ASSERT(tsv_length >= 0, "[Error] " + getInstanceName() +
+                " -> TSV length must be >= 0!");
         ASSERT(required_delay >= 0, "[Error] " + getInstanceName() + 
                 " -> Required delay must be >= 0!");
 
-        const String& wire_layer = getParameter("WireLayer");
-        double wire_width = getGenProperties()->get("WireWidth").toDouble();
-        double wire_spacing = getGenProperties()->get("WireSpacing").toDouble();
+		getGenProperties()->set("TSVLength", tsv_length);
+		getGenProperties()->set("TSVDiameter", tsv_diameter);
+		getGenProperties()->set("TSVPitch", tsv_pitch);
+		getGenProperties()->set("BumpDiameter", bump_diameter);
 
-        // Calculate the total wire cap and total wire res
-        double wire_cap_per_len = getGenProperties()->get("WireCapacitancePerLength").toDouble();
-        double wire_res_per_len = getGenProperties()->get("WireResistancePerLength").toDouble();
-        double total_wire_cap = wire_cap_per_len * wire_length;
-        double total_wire_res = wire_res_per_len * wire_length;
+		// TSV is calculated taking in consideration TSV Bump, Silicon capacitance and Silicon Dioxide Capacitance
+		// TSV Resistance is calculated taking in consideration frequency
+		// All properties are assumed in a 100 °C environment
+
+		double cap_bump = getTechModel()->calculateBumpCapacitance( bump_diameter/2, tsv_diameter/2);
+		double silicon_res = getTechModel()->calculateSiliconResistance(tsv_pitch, tsv_diameter, tsv_length);
+		double silicon_cap = getTechModel()->calculateSiliconCapacitance(tsv_length, tsv_pitch, tsv_diameter);
+		double tsv_res = getTechModel()->calculateTSVResistance(silicon_res, silicon_cap, tsv_diameter, tsv_length, freq);
+		double tsv_cap = getTechModel()->calculateTSVCapacitance(silicon_res, silicon_cap, tsv_diameter/2, tsv_length, freq);
+		tsv_cap += cap_bump;
+		double total_tsv_res = tsv_res * number_bits;
+		double total_tsv_cap = tsv_cap * number_bits;
 
         m_repeater_->update();
 
@@ -160,14 +147,14 @@ namespace DSENT
         unsigned int number_segments = increment_segments;
         double delay;
         m_repeater_->setMinDrivingStrength();
-        m_repeater_->getNet("Y")->setDistributedCap(total_wire_cap / number_segments);
-        m_repeater_->getNet("Y")->setDistributedRes(total_wire_res / number_segments);
+        m_repeater_->getNet("Y")->setDistributedCap(total_tsv_cap / number_segments);
+        m_repeater_->getNet("Y")->setDistributedRes(total_tsv_res / number_segments);
         m_repeater_load_->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
         m_timing_tree_->performCritPathExtract(m_repeater_->getNet("A"));
         delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
 
         // If everything is 0, use number_segments min-sized repeater
-        if(wire_length != 0)
+        if(tsv_length != 0)
         {
             // Set the initial number of segments based on isKeepParity
             double last_min_size_delay = 0;
@@ -180,6 +167,7 @@ namespace DSENT
 
             while(required_delay < delay)
             {
+				//cout << "delay: " << delay << endl;
                 Log::printLine(getInstanceName() + " -> Repeater Insertion Iteration " + (String)iteration + 
                         ": Required delay = " + (String)required_delay + 
                         ", Delay = " + (String)delay + 
@@ -206,8 +194,8 @@ namespace DSENT
                 {
                     number_segments += increment_segments;
                     m_repeater_->setMinDrivingStrength();
-                    m_repeater_->getNet("Y")->setDistributedCap(total_wire_cap / number_segments);
-                    m_repeater_->getNet("Y")->setDistributedRes(total_wire_res / number_segments);
+                    m_repeater_->getNet("Y")->setDistributedCap(total_tsv_cap / number_segments);
+                    m_repeater_->getNet("Y")->setDistributedRes(total_tsv_res / number_segments);
                     m_repeater_load_->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
                     m_timing_tree_->performCritPathExtract(m_repeater_->getNet("A"));
                     delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
@@ -238,28 +226,26 @@ namespace DSENT
             }
         }
 
-		cout << "Wire | Res = " << wire_res_per_len << endl;
-		cout << "Wire | Cap = " << wire_cap_per_len << " | " << number_segments << endl;
-		cout << "Wire | Total Res = " << total_wire_res << endl;
-		cout << "Wire | Total Cap = " << total_wire_cap << " | " << number_segments << endl << endl;
+		cout << "TSV | Total Res = " << total_tsv_res << endl;
+		cout << "TSV | Total Cap = " << total_tsv_cap << " | " << number_segments << endl;
 
         // Update electrical interfaces
         getLoad("In_Cap")->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
         getDelay("In_to_Out_delay")->setDelay(delay);
-        getDriver("Out_Ron")->setOutputRes(m_repeater_->getDriver("Y_Ron")->getOutputRes() + (total_wire_res / number_segments));
+        getDriver("Out_Ron")->setOutputRes(m_repeater_->getDriver("Y_Ron")->getOutputRes() + (total_tsv_res / number_segments));
 
         getGenProperties()->set("NumberSegments", number_segments);
 
         // Update area, power results
         resetElectricalAtomicResults();
         addElecticalAtomicResultValues(m_repeater_, number_segments * number_bits);
-        double wire_area = wire_length * (wire_width + wire_spacing) * number_bits;
-        addElecticalWireAtomicResultValue(wire_layer, wire_area);
+       	//double wire_area = wire_length * (wire_width + wire_spacing) * number_bits;
+        //addElecticalWireAtomicResultValue(wire_layer, wire_area);
 
         return;
     }
 
-    void RepeatedLink::useModel()
+    void TSV::useModel()
     {
         // Update the transition information for the modeled repeater
         // Since we only modeled one repeater. So the transition information for 0->0 and 1->1 
@@ -290,7 +276,7 @@ namespace DSENT
         return;
     }
 
-    void RepeatedLink::propagateTransitionInfo()
+    void TSV::propagateTransitionInfo()
     {
         unsigned int number_segments = getGenProperties()->get("NumberSegments");
 

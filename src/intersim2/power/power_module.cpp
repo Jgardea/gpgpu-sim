@@ -34,6 +34,7 @@
 //jgardea
 #include <string>
 #include <sstream>
+#include <cstdlib>
 #include "iq3d_router.hpp"
 #include "mesh3D.hpp"
 #include "vertical_channel.hpp"
@@ -60,6 +61,9 @@ Power_Module::Power_Module(vector<Network *> n , const Configuration &config)
   total_network_dynam.resize(nets.size(), 0.0);
   total_network_leakage.resize(nets.size(), 0.0);
   total_components_leakage.resize(3, 0.0);
+
+  frequency = 1000000000 * atof(config.GetStr("frequency").c_str()); // frequency in Hz
+
   // asymmetric networks work only with mesh3D topology
   if (asymmetric) assert(topology == "mesh3D");
 
@@ -571,8 +575,9 @@ void Power_Module::dsent()
         total_dynamic += total_network_dynam[n];
         total_leakage += total_network_leakage[n];
     }
-    
-    cout << "\nTotal Router Dynamic Power:               " << total_components_dynam[_router] << endl;
+   
+   	cout << "\nTotal Cycles:                             " << totalTime << endl; 
+    cout << "Total Router Dynamic Power:               " << total_components_dynam[_router] << endl;
     cout << "Total Router Leakage Power:               " << total_components_leakage[_router] << endl;
     cout << "Total Router Power:                       " << total_components_leakage[_router] + total_components_dynam[_router] << endl;
 
@@ -587,6 +592,17 @@ void Power_Module::dsent()
     cout << "Total Dynamic Power:                      " << total_dynamic << endl;
     cout << "Total Leakage Power:                      " << total_leakage << endl;
     cout << "Total Interconnect Power:                 " << total_dynamic + total_leakage << endl;
+	
+	cout << "\npower_values:0,";
+	cout << total_dynamic + total_leakage << ","; // total power consumed
+	cout << total_dynamic << ",";				  
+	cout << total_leakage << ",";
+	cout << total_components_dynam[_router] << ",";
+	cout << total_components_dynam[_channel] << ",";
+	cout << total_components_dynam[_ver_channel] << ",";
+	cout << total_components_leakage[_router] << ",";
+	cout << total_components_leakage[_channel] << ",";
+	cout << total_components_leakage[_ver_channel] << endl;
 }
 
 void Power_Module::runDsent( )
@@ -621,14 +637,12 @@ void Power_Module::runDsent( )
     overwrite += flit_sz + asym_net + ver_bus; 
     config_dsent.push_back(overwrite);
 
-    cout << "\nDSENT Overwrite: " << config_dsent[config_dsent.size()-1] << endl << endl;
+    //cout << "\nDSENT Overwrite: " << config_dsent[config_dsent.size()-1] << endl << endl;
     energy_results = DSENT::DSENT::run(config_dsent);
 }
 
 void Power_Module::calcNetPower(Network *net, int index)
 {
-#ifdef ALLOW_DSENT
-
     // Variables for hydbrid mesh topology
     Mesh3D* net_mesh3d;
     vector<VerticalChannel *> ver_chan;
@@ -640,9 +654,9 @@ void Power_Module::calcNetPower(Network *net, int index)
 // =======================
     if (topology == "mesh3D")
     {
-        net_mesh3d = (Mesh3D*) net; //TODO veticalnet_mesh3d = (Mesh3D*) net; //TODO vetical
-        ver_chan = net_mesh3d->GetVerticalChannels(); //TODO vetical
-        verchan_activity.resize(ver_chan.size(), 0); //TODO vertical
+        net_mesh3d = (Mesh3D*) net; 
+        ver_chan = net_mesh3d->GetVerticalChannels(); 
+        verchan_activity.resize(ver_chan.size(), 0); 
 
         for(unsigned i = 0; i < ver_chan.size(); i++)
         {
@@ -736,26 +750,31 @@ void Power_Module::calcNetPower(Network *net, int index)
         }
     }
     
-    calcEnergy(asymmetric && index); // get the values from dsent resul
+    calcEnergy(asymmetric && index); // get the values from dsent result
 
-    cout << "Writes: " << total_writes <<  endl;
-    cout << "Reads: " << total_reads << endl;
-    cout << "Traversals: " << total_traversals << endl;
-    cout << "Arbitrations: " << total_arbitrations << endl;
-    cout << "Inject Channel Sends: " << inject_sum << endl;
-    cout << "Eject Channel Sends: " << eject_sum << endl;
-    cout << "Network Channel Sends: "<< chan_sum << endl;
-    cout << "Vertica Channel Sends: " << verchan_sum << endl;
-    cout << "Horizontal Channels Sends: " << eject_sum + inject_sum + chan_sum << endl;
+	if (0)
+	{
+		cout << "Writes: " << total_writes <<  endl;
+		cout << "Reads: " << total_reads << endl;
+		cout << "Traversals: " << total_traversals << endl;
+		cout << "Arbitrations: " << total_arbitrations << endl;
+		cout << "Inject Channel Sends: " << inject_sum << endl;
+		cout << "Eject Channel Sends: " << eject_sum << endl;
+		cout << "Network Channel Sends: "<< chan_sum << endl;
+		cout << "Vertica Channel Sends: " << verchan_sum << endl;
+		cout << "Horizontal Channels Sends: " << eject_sum + inject_sum + chan_sum << endl;
+	}
 
-    double write_power = (total_writes/totalTime) * write_energy * fCLK;
-    double read_power = (total_reads/totalTime) * read_energy * fCLK;
-    double traversal_power = (total_traversals/totalTime) * traversal_energy * fCLK;
-    double arb1_power = (total_arbitrations/totalTime) * arb1_energy * fCLK;
-    double arb2_power = (total_arbitrations/totalTime) * arb2_energy * fCLK;
     
-    double channel_power = ((eject_sum + inject_sum + chan_sum)/totalTime) * channel_energy * fCLK ;
-    double ver_channel_power = (verchan_sum/totalTime) * ver_channel_energy * fCLK;
+
+    double write_power = (total_writes/totalTime) * write_energy * frequency;
+    double read_power = (total_reads/totalTime) * read_energy * frequency;
+    double traversal_power = (total_traversals/totalTime) * traversal_energy * frequency;
+    double arb1_power = (total_arbitrations/totalTime) * arb1_energy * frequency;
+    double arb2_power = (total_arbitrations/totalTime) * arb2_energy * frequency;
+    
+    double channel_power = ((eject_sum + inject_sum + chan_sum)/totalTime) * channel_energy * frequency ;
+    double ver_channel_power = (verchan_sum/totalTime) * ver_channel_energy * frequency;
     double router_power = write_power + read_power + traversal_power + arb1_power + arb2_power;
 
     int horizontal_channels = inject.size() + eject.size() + chan.size();
@@ -784,37 +803,40 @@ void Power_Module::calcNetPower(Network *net, int index)
     total_network_dynam[index] = total_dynamic;
     total_network_leakage[index] = total_leakage; 
 
-    // Subnetwork values display
-    cout<< "\n-----------------------------------------\n" ;
-    cout<< "- Subnet " << index << " Power Summary\n\n" ;
-    cout<< "- Completion Time:                  "<<totalTime <<"\n" ;
-    cout<< "- Flit Widths:                      "<< net_flit_size <<"\n\n" ;
+	if ( 0 ) // subnet detailed info
+	{
+		// Subnetwork values display
+		cout<< "\n-----------------------------------------\n" ;
+		cout<< "- Subnet " << index << " Power Summary" << endl ;
+		cout<< "- Completion Time:                  "<< totalTime <<"\n" ;
+		cout<< "- Flit Widths:                      "<< net_flit_size <<"\n" ;
+		
+		cout<< "- Channel" << endl;
 
-    cout<< "- Channel Dynamic Power:            "<< channel_power <<"\n" ;
-    cout<< "- Channel Leakage Power:            "<< channel_leakage <<"\n" ;
-    cout<< "- Channel Power:                    "<< channel_power + channel_leakage <<"\n\n";
+		cout<< "- Channel Dynamic Power:            "<< channel_power <<"\n" ;
+		cout<< "- Channel Leakage Power:            "<< channel_leakage <<"\n" ;
+		cout<< "- Channel Power:                    "<< channel_power + channel_leakage <<"\n";
 
-    cout<< "- Vertical Channel Dynamic Power:   "<< ver_channel_power <<"\n" ;
-    cout<< "- Vertical Channel Leakage Power:   "<< ver_channel_leakage <<"\n" ;
-    cout<< "- Vertical Channel Power:           "<< ver_channel_power + ver_channel_leakage <<"\n\n";
+		cout<< "- Vertical Channel Dynamic Power:   "<< ver_channel_power <<"\n" ;
+		cout<< "- Vertical Channel Leakage Power:   "<< ver_channel_leakage <<"\n" ;
+		cout<< "- Vertical Channel Power:           "<< ver_channel_power + ver_channel_leakage <<"\n";
 
-    cout<< "- Input Read Power:                 "<< read_power <<"\n";
-    cout<< "- Input Write Power:                "<< write_power <<"\n";
-    cout<< "- Switch Traversal Power:           "<< traversal_power <<"\n";
-    cout<< "- Switch Arbitration1 Power:        "<< arb1_power <<"\n" ; 
-    cout<< "- Switch Arbitration2 Power:        "<< arb2_power <<"\n" ;
-    cout<< "- Switch Power:                     "<< traversal_power + arb1_power + arb2_power <<"\n";
-    cout<< "- Router Dynamic Power:             "<< router_power <<"\n";
-    cout<< "- Router Leakage Power:             "<< router_leakage <<"\n\n";
-    
-    cout<< "- Total Dynamic Power:              "<< total_dynamic << "\n";
-    cout<< "- Total Leakage Power:              "<< total_leakage << "\n\n";
+		cout<< "- Input Read Power:                 "<< read_power <<"\n";
+		cout<< "- Input Write Power:                "<< write_power <<"\n";
+		cout<< "- Switch Traversal Power:           "<< traversal_power <<"\n";
+		cout<< "- Switch Arbitration1 Power:        "<< arb1_power <<"\n" ; 
+		cout<< "- Switch Arbitration2 Power:        "<< arb2_power <<"\n" ;
+		cout<< "- Switch Power:                     "<< traversal_power + arb1_power + arb2_power <<"\n";
+		cout<< "- Router Dynamic Power:             "<< router_power <<"\n";
+		cout<< "- Router Leakage Power:             "<< router_leakage <<"\n";
+		cout<< "- Router Power:                     "<< router_power + router_leakage << "\n";
+		
+		cout<< "- Total Dynamic Power:              "<< total_dynamic << "\n";
+		cout<< "- Total Leakage Power:              "<< total_leakage << "\n";
 
-    cout<< "- Total Power:                      "<<totalpower <<"\n";
-    cout<< "-----------------------------------------\n";
-#else
-    cout << "DSENT has not been included in this build of booksim. Please check booksim Makfile" << endl;
-#endif
+		cout<< "- Total Power:                      "<<totalpower <<"\n";
+		cout<< "-----------------------------------------\n";
+	}
 }
 
 void Power_Module::getMonitors(const SwitchMonitor * &sm, const BufferMonitor * &bm, Router* router)

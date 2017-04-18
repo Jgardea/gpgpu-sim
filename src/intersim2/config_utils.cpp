@@ -237,13 +237,13 @@ bool ParseArgs(Configuration * cf, int argc, char * * argv)
       // parse config file
       cf->ParseFile( argv[i] );
       ifstream in(argv[i]);
-      cout << "BEGIN Configuration File: " << argv[i] << endl;
-      while (!in.eof()) {
-	char c;
-	in.get(c);
-	cout << c ;
-      }
-      cout << "END Configuration File: " << argv[i] << endl;
+     // cout << "BEGIN Configuration File: " << argv[i] << endl; // jgardea
+     // while (!in.eof()) {
+	 //   char c;
+	 //   in.get(c);
+	 //   cout << c ;
+     // }
+     // cout << "END Configuration File: " << argv[i] << endl;
       rc = true;
     } else if(pos != string::npos)  {
       // override individual parameter

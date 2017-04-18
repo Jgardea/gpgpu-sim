@@ -24,7 +24,7 @@ namespace DSENT
 
         // Store results in a easy to access way for Booksim  // jgardea
         getResults( ); // jgardea
-        printResults( ); // jgardea
+        //printResults( ); // jgardea                                       Used for debugging
         // Finalize DSENT framework (close log file, ...)
         finalize();
         return ms_energy_results;
@@ -205,7 +205,7 @@ namespace DSENT
                 cout << str << endl;
                 cout << String(str.size(), '-') << endl;
             }
-            const Result* result = (const Result*) processQuery(curr_query, true);//TODO change back 
+            const Result* result = (const Result*) processQuery(curr_query, false);// TODO it prints results 
             ms_results.push_back(result); // jgardea
 
             if(ms_is_verbose_)

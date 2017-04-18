@@ -50,7 +50,6 @@ namespace DSENT
         addParameterName("Link->WireLayer");
         addParameterName("Link->WireWidthMultiplier");
         addParameterName("Link->WireSpacingMultiplier");
-		// TSV parameters
 
         return;
     }
@@ -58,10 +57,9 @@ namespace DSENT
     void BSElectricalMesh::initProperties()
     {
         addPropertyName("SitePitch");
+        //addPropertyName("VerticalLinkLength");  // jgardea
 		addPropertyName("TSV->Length");
 		addPropertyName("TSV->Diameter");
-		addPropertyName("TSV->Pitch");
-		addPropertyName("TSV->BumpDiameter");
         return;
     }
 
@@ -83,13 +81,12 @@ namespace DSENT
         const String& link_wire_layer = getParameter("Link->WireLayer");
         const String& link_wire_width_multiplier = getParameter("Link->WireWidthMultiplier");
         const String& link_wire_spacing_multiplier = getParameter("Link->WireSpacingMultiplier");
-		
         unsigned  router_ports = getParameter("Router->NumberPorts").toUInt();
 
         getGenProperties()->set("NumberRouters", 1);
         getGenProperties()->set("NumberLinks", 1);
         getGenProperties()->set("NumberRouterToSiteLinks", 1);
-		getGenProperties()->set("NumberTSV", 1);
+		getGenProperties()->set("NumberTSV", 1)
         getGenProperties()->set("Router->NumberInputPorts", router_ports );
         getGenProperties()->set("Router->NumberOutputPorts", router_ports );
 
@@ -122,9 +119,13 @@ namespace DSENT
         rr_link->setParameter("WireSpacingMultiplier", link_wire_spacing_multiplier);
         rr_link->construct();
 
+        //ElectricalModel* ver_link = (ElectricalModel*) ModelGen::createModel("RepeatedLink", "VerticalLink", getTechModel());
 		ElectricalModel* ver_link = (ElectricalModel*) ModelGen::createModel("TSV", "VerticalLink", getTechModel());
+		 
         ver_link->setParameter("NumberBits", number_bits_per_flit);
-		ver_link->setParameter("Frequency", getParameter("Frequency"));
+        ver_link->setParameter("WireLayer", link_wire_layer);
+        ver_link->setParameter("WireWidthMultiplier", link_wire_width_multiplier);
+        ver_link->setParameter("WireSpacingMultiplier", link_wire_spacing_multiplier);
         ver_link->construct(); 
 
         // Connect ports
@@ -191,6 +192,7 @@ namespace DSENT
         energy_per_flit->addSubResult(router->getEventResult("TraverseCrossbar->Multicast1"), "MeshRouter", 1);
         energy_per_flit->addSubResult(router->getEventResult("ArbitrateSwitch->ArbitrateStage1"), "MeshRouter", 1);
         energy_per_flit->addSubResult(router->getEventResult("ArbitrateSwitch->ArbitrateStage2"), "MeshRouter", 1);
+        //energy_per_flit->addSubResult(router->getEventResult("DistributeClock"), "MeshRouter", 1);
 
         if ( isAsymmetric() )
         {
@@ -222,9 +224,11 @@ namespace DSENT
             asym_rr_link->setParameter("WireSpacingMultiplier", link_wire_spacing_multiplier);
             asym_rr_link->construct();
 
-			ElectricalModel* asym_ver_link = (ElectricalModel*) ModelGen::createModel("TSV", "AsymVerticalLink", getTechModel());
+            ElectricalModel* asym_ver_link = (ElectricalModel*) ModelGen::createModel("RepeatedLink", "AsymVerticalLink", getTechModel());
             asym_ver_link->setParameter("NumberBits", number_bits_per_flit_asym);
-			asym_ver_link->setParameter("Frequency", getParameter("Frequency"));
+            asym_ver_link->setParameter("WireLayer", link_wire_layer);
+            asym_ver_link->setParameter("WireWidthMultiplier", link_wire_width_multiplier);
+            asym_ver_link->setParameter("WireSpacingMultiplier", link_wire_spacing_multiplier);
             asym_ver_link->construct();
 
             // Connect ports
@@ -283,6 +287,7 @@ namespace DSENT
             energy_per_flit->addSubResult(asym_router->getEventResult("TraverseCrossbar->Multicast1"), "AsymMeshRouter", 1);
             energy_per_flit->addSubResult(asym_router->getEventResult("ArbitrateSwitch->ArbitrateStage1"), "AsymMeshRouter", 1);
             energy_per_flit->addSubResult(asym_router->getEventResult("ArbitrateSwitch->ArbitrateStage2"), "AsymMeshRouter", 1);
+            //energy_per_flit->addSubResult(asym_router->getEventResult("DistributeClock"), "AsymMeshRouter", 1);
         }
         
         return;
@@ -308,25 +313,19 @@ namespace DSENT
         double rr_link_delay = std::max(1e-99, 1.0 / clock_freq - link_delay_margin);
         double router_delay = 1.0 / clock_freq;
 
-        //double ver_link_length = getProperty("VerticalLinkLength");
+        double ver_link_length = getProperty("VerticalLinkLength");
 		double ver_link_length = getProperty("TSV->Length");
-		double ver_link_diameter = getProperty("TSV->Diameter");
-		double ver_link_pitch = getProperty("TSV->Pitch");
-		double ver_link_bump_diameter = getProperty("TSV->BumpDiameter");
 
         Model* rr_link = getSubInstance("Link");
         rr_link->setProperty("WireLength", rr_link_length);
         rr_link->setProperty("Delay", rr_link_delay);
-        //rr_link->setProperty("IsKeepParity", "TRUE");
+        rr_link->setProperty("IsKeepParity", "TRUE");
         rr_link->update();
         
         Model* ver_link = getSubInstance("VerticalLink");
-		ver_link->setProperty("Length", ver_link_length);
-		ver_link->setProperty("Diameter", ver_link_diameter);
-		ver_link->setProperty("Pitch", ver_link_pitch);
-		ver_link->setProperty("BumpDiameter", ver_link_bump_diameter);
+        ver_link->setProperty("WireLength", ver_link_length);
         ver_link->setProperty("Delay", rr_link_delay);
-        //ver_link->setProperty("IsKeepParity", "TRUE");
+        ver_link->setProperty("IsKeepParity", "TRUE");
         ver_link->update();
 
         ElectricalModel* router = (ElectricalModel*)getSubInstance("MeshRouter");
@@ -340,16 +339,13 @@ namespace DSENT
             Model* asym_rr_link = getSubInstance("AsymLink");
             asym_rr_link->setProperty("WireLength", rr_link_length);
             asym_rr_link->setProperty("Delay", rr_link_delay);
-            //asym_rr_link->setProperty("IsKeepParity", "TRUE");
+            asym_rr_link->setProperty("IsKeepParity", "TRUE");
             asym_rr_link->update();
 
             Model* asym_ver_link = getSubInstance("AsymVerticalLink");
-			asym_ver_link->setProperty("Length", ver_link_length);
-			asym_ver_link->setProperty("Diameter", ver_link_diameter);
-			asym_ver_link->setProperty("Pitch", ver_link_pitch);
-			asym_ver_link->setProperty("BumpDiameter", ver_link_bump_diameter);
+            asym_ver_link->setProperty("WireLength", ver_link_length);
             asym_ver_link->setProperty("Delay", rr_link_delay);
-            //asym_ver_link->setProperty("IsKeepParity", "TRUE");
+            asym_ver_link->setProperty("IsKeepParity", "TRUE");
             asym_ver_link->update();
 
             ElectricalModel* asym_router = (ElectricalModel*)getSubInstance("AsymMeshRouter");

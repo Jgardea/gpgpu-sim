@@ -46,6 +46,15 @@ namespace DSENT
             // and technology information (vdd, subthreshold swing, subthreshold dibl swing)
             double calculateLeakageCurrentFactor(unsigned int num_stacks_, const vector<double>& stacked_mos_widths_, unsigned int input_vector_, double vdd_, double subthreshold_swing_, double dibl_swing_) const;
 
+			// TSV // jgardea
+			double calculateBumpCapacitance( double bump_radius_, double tsv_radius_ ) const;
+			double calculateSiliconResistance( double pitch_, double diameter_, double height_) const;
+			double calculateSiliconCapacitance( double length_, double pitch_, double diameter_) const;
+			double calculateTSVResistance(double si_res_, double si_cap_, double radius_, double length_, double freq_) const;
+			double calculateTSVCapacitance(double si_res_, double si_cap_, double radius_, double height_, double freq_) const; 
+			double calculateSkin(double frequency ) const;
+
+
             // Wire
             // Check if the wire layer exist
             bool isWireLayerExist(const String& layer_name_) const;
@@ -68,4 +77,3 @@ namespace DSENT
 } // namespace DSENT
 
 #endif // __DSENT_TECH_TECH_MODEL_H__
-

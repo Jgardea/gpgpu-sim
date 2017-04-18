@@ -75,6 +75,9 @@ protected:
   double channel_leakage;
   double ver_channel_leakage;
 
+  double frequency;
+  // .. jgardea
+
   int classes;
   //all channels are this width
   double channel_width;

@@ -1,8 +1,9 @@
-#ifndef __DSENT_MODEL_ELECTRICAL_REPEATED_LINK_H__
-#define __DSENT_MODEL_ELECTRICAL_REPEATED_LINK_H__
+#ifndef __DSENT_MODEL_TSV_H__
+#define __DSENT_MODEL_TSV_H__
 
 #include "util/CommonType.h"
-#include "model/ElectricalModel.h"
+//#include "model/ElectricalModel.h"
+#include "electrical/RepeatedLink.h"
 
 namespace DSENT
 {
@@ -10,20 +11,21 @@ namespace DSENT
     class ElectricalLoad;
     class ElectricalTimingTree;
 
-    class RepeatedLink : public ElectricalModel
+    //class TSV : public ElectricalModel
+	class TSV : public RepeatedLink
     {
         public:
-            RepeatedLink(const String& instance_name_, const TechModel* tech_model_); 
-            virtual ~RepeatedLink();
+            TSV(const String& instance_name_, const TechModel* tech_model_); 
+            virtual ~TSV();
 
         public:
             // Set a list of properties' name needed to construct model
-            virtual void initParameters();
+            void initParameters();
             // Set a list of properties' name needed to construct model
-            virtual void initProperties();
+            void initProperties();
 
             // Clone and return a new instance
-            virtual RepeatedLink* clone() const;
+            virtual TSV* clone() const;
 
         protected:
             // Build the model
@@ -37,8 +39,8 @@ namespace DSENT
             StdCell* m_repeater_;
             ElectricalLoad* m_repeater_load_;
             ElectricalTimingTree* m_timing_tree_;
-    }; // class RepeatedLink
+    }; // class TSV
 } // namespace DSENT
 
-#endif // __DSENT_MODEL_ELECTRICAL_REPEATED_LINK_H__
+#endif // __DSENT_MODEL_TSV_H__
 

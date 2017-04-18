@@ -2286,7 +2286,7 @@ void TrafficManager::DisplayStats(ostream & os) const {
 }
 
 void TrafficManager::DisplayOverallStats( ostream & os ) const {
-
+	
     os << "\n\n====== Overall Traffic Statistics ======" << endl;
     for ( int c = 0; c < _classes; ++c ) {
 
@@ -2359,6 +2359,9 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
            << " (" << _total_sims << " samples)" << endl;
     
         os << "Hops average = " << _overall_hop_stats[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+		os << "Total Packets = " << _plat_stats[c]->NumSamples() / (double)_total_sims 	// jgardea
            << " (" << _total_sims << " samples)" << endl;
     
 #ifdef TRACK_STALLS
@@ -2500,7 +2503,7 @@ void TrafficManager::_ChannelUtilizationStats( ostream & os )
 
     // --------------- Overall Channel Utilization ----------
 
-    os << "\nOverall Vertical Channel Utilization = " << (_overall_verchan_utilization /= (double)_subnets) << endl;
+    os << "Overall Vertical Channel Utilization = " << (_overall_verchan_utilization /= (double)_subnets) << endl;
     os << "Overall Horizontal Channel Utilization = " << (_overall_horchan_utlization /= (double)_subnets) << endl << endl;
   }
   else if ( _topology == "mesh" )
@@ -2545,6 +2548,8 @@ string TrafficManager::_OverallStatsCSV(int c) const
        << ',' << _most_utilized_vertical
        << ',' << _overall_avg_sent_packets[c] / (double)_total_sims
        << ',' << _overall_avg_accepted_packets[c] / (double)_total_sims
+	   << ',' << _overall_avg_accepted[c] / _overall_avg_accepted_packets[c]
+	   << ',' << _plat_stats[c]->NumSamples() / (double)_total_sims
        << ',' << _traffic[c]
        << ',' << _use_read_write[c]
        << ',' << _load[c]
@@ -2569,9 +2574,7 @@ string TrafficManager::_OverallStatsCSV(int c) const
        << ',' << _overall_min_accepted[c] / (double)_total_sims
        << ',' << _overall_avg_accepted[c] / (double)_total_sims
        << ',' << _overall_max_accepted[c] / (double)_total_sims
-       << ',' << _overall_avg_sent[c] / _overall_avg_sent_packets[c]
-       << ',' << _overall_avg_accepted[c] / _overall_avg_accepted_packets[c];
-       
+       << ',' << _overall_avg_sent[c] / _overall_avg_sent_packets[c];
 
 #ifdef TRACK_STALLS
     os << ',' << (double)_overall_buffer_busy_stalls[c] / (double)_total_sims
