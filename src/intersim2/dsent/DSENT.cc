@@ -478,7 +478,7 @@ namespace DSENT
         return -1.0;
     }
     
-    void DSENT::printResults( )
+    void DSENT::printResults( ) // jgardea
     {
         std::cout << endl;
         for ( unsigned i = 0; i < ms_energy_results.size(); i++ )

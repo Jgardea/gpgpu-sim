@@ -35,6 +35,7 @@ namespace DSENT
     {
         addParameterName("WireLayer", "Vertical");
 		addParameterName("Frequency");
+		addParameterName("NumLayers");
         return;
     }
 
@@ -107,14 +108,18 @@ namespace DSENT
 
     void TSV::updateModel()
     {
+		// Paramters
         unsigned int number_bits = getParameter("NumberBits").toUInt();
 		double freq = getParameter("Frequency");
+		int num_layers = getParameter("NumLayers").toDouble();
 
-        // Get properties
+		// TSV Properties
 		double tsv_length = getProperty("Length").toDouble();
 		double tsv_diameter = getProperty("Diameter").toDouble();
 		double tsv_pitch = getProperty("Pitch").toDouble();
 		double bump_diameter = getProperty("BumpDiameter").toDouble();
+		
+		// General Properties
         double required_delay = getProperty("Delay").toDouble();
         bool isKeepParity = getProperty("IsKeepParity").toBool();
 
@@ -130,25 +135,27 @@ namespace DSENT
 
 		// TSV is calculated taking in consideration TSV Bump, Silicon capacitance and Silicon Dioxide Capacitance
 		// TSV Resistance is calculated taking in consideration frequency
-		// All properties are assumed in a 100 °C environment
+		// All properties are assumed in a 100 °C environment	
+		// Number of layers determines, how many segments and bumps will vbe needed from layer 1 to layer n-1
 
 		double cap_bump = getTechModel()->calculateBumpCapacitance( bump_diameter/2, tsv_diameter/2);
-		double silicon_res = getTechModel()->calculateSiliconResistance(tsv_pitch, tsv_diameter, tsv_length);
+		double ox_cap = getTechModel()->calculateOxCapacitance( tsv_diameter/2, tsv_length);
 		double silicon_cap = getTechModel()->calculateSiliconCapacitance(tsv_length, tsv_pitch, tsv_diameter);
-		double tsv_res = getTechModel()->calculateTSVResistance(silicon_res, silicon_cap, tsv_diameter, tsv_length, freq);
-		double tsv_cap = getTechModel()->calculateTSVCapacitance(silicon_res, silicon_cap, tsv_diameter/2, tsv_length, freq);
+		double tsv_cap = getTechModel()->calculateTSVCapacitance( ox_cap, silicon_cap, tsv_diameter/2, tsv_length, freq);
+		double tsv_res = getTechModel()->calculateTSVResistance(tsv_diameter, tsv_length, freq);
+	
 		tsv_cap += cap_bump;
-		double total_tsv_res = tsv_res * number_bits;
-		double total_tsv_cap = tsv_cap * number_bits;
-
+		tsv_cap *= (num_layers-1);  
+		tsv_res *= (num_layers-1);
+	
         m_repeater_->update();
 
         unsigned int increment_segments = (isKeepParity)? 2:1;
         unsigned int number_segments = increment_segments;
         double delay;
         m_repeater_->setMinDrivingStrength();
-        m_repeater_->getNet("Y")->setDistributedCap(total_tsv_cap / number_segments);
-        m_repeater_->getNet("Y")->setDistributedRes(total_tsv_res / number_segments);
+        m_repeater_->getNet("Y")->setDistributedCap(tsv_cap / number_segments);
+        m_repeater_->getNet("Y")->setDistributedRes(tsv_res / number_segments);
         m_repeater_load_->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
         m_timing_tree_->performCritPathExtract(m_repeater_->getNet("A"));
         delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
@@ -194,8 +201,8 @@ namespace DSENT
                 {
                     number_segments += increment_segments;
                     m_repeater_->setMinDrivingStrength();
-                    m_repeater_->getNet("Y")->setDistributedCap(total_tsv_cap / number_segments);
-                    m_repeater_->getNet("Y")->setDistributedRes(total_tsv_res / number_segments);
+                    m_repeater_->getNet("Y")->setDistributedCap(tsv_cap / number_segments);
+                    m_repeater_->getNet("Y")->setDistributedRes(tsv_res / number_segments);
                     m_repeater_load_->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
                     m_timing_tree_->performCritPathExtract(m_repeater_->getNet("A"));
                     delay = m_timing_tree_->calculateCritPathDelay(m_repeater_->getNet("A")) * number_segments;
@@ -225,14 +232,12 @@ namespace DSENT
                 Log::printLine(std::cerr, warning_msg);
             }
         }
-
-		cout << "TSV | Total Res = " << total_tsv_res << endl;
-		cout << "TSV | Total Cap = " << total_tsv_cap << " | " << number_segments << endl;
+		//cout << "TSV  | Total Res = " << tsv_res << "\tTotal Cap = " << tsv_cap << " | " << number_segments << endl << endl;
 
         // Update electrical interfaces
         getLoad("In_Cap")->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
         getDelay("In_to_Out_delay")->setDelay(delay);
-        getDriver("Out_Ron")->setOutputRes(m_repeater_->getDriver("Y_Ron")->getOutputRes() + (total_tsv_res / number_segments));
+        getDriver("Out_Ron")->setOutputRes(m_repeater_->getDriver("Y_Ron")->getOutputRes() + (tsv_res / number_segments));
 
         getGenProperties()->set("NumberSegments", number_segments);
 
@@ -294,4 +299,3 @@ namespace DSENT
     }
 
 } // namespace DSENT
-

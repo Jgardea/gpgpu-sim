@@ -48,12 +48,11 @@ namespace DSENT
 
 			// TSV // jgardea
 			double calculateBumpCapacitance( double bump_radius_, double tsv_radius_ ) const;
-			double calculateSiliconResistance( double pitch_, double diameter_, double height_) const;
 			double calculateSiliconCapacitance( double length_, double pitch_, double diameter_) const;
-			double calculateTSVResistance(double si_res_, double si_cap_, double radius_, double length_, double freq_) const;
-			double calculateTSVCapacitance(double si_res_, double si_cap_, double radius_, double height_, double freq_) const; 
+			double calculateOxCapacitance ( double radius_, double height_) const;
+			double calculateTSVResistance(double radius_, double length_, double freq_) const;
+			double calculateTSVCapacitance(double ox_cap_, double si_cap_, double radius_, double height_, double freq_) const; 
 			double calculateSkin(double frequency ) const;
-
 
             // Wire
             // Check if the wire layer exist

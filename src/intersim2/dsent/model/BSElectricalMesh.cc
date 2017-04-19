@@ -1,3 +1,8 @@
+/* Jesus Gardea
+ * Electrical MEesh based on DSENT defualt Mesh configuration.
+ * This configuraiton includes the energy dissipation measure of Through Silicon Vias (TSV) to be used with a 3D NoC mesh implementaiotn in BoosSim Simulator
+ */
+
 #include "model/BSElectricalMesh.h"
 
 #include <cmath>
@@ -30,8 +35,8 @@ namespace DSENT
         addParameterName("Frequency");
         // Physical Parameters
         addParameterName("NumberBitsPerFlit");
-        addParameterName("NumberBitsPerFlitAsym"); // jgardea
-        addParameterName("AsymmetricNetwork");
+        addParameterName("NumberBitsPerFlitAsym"); 
+        addParameterName("AsymmetricNetwork");	   
         addParameterName("VerticalBus");
         // Router parameters
         addParameterName("Router->NumberPorts");
@@ -51,7 +56,7 @@ namespace DSENT
         addParameterName("Link->WireWidthMultiplier");
         addParameterName("Link->WireSpacingMultiplier");
 		// TSV parameters
-
+		addParameterName("TSV->NumLayers");
         return;
     }
 
@@ -83,7 +88,7 @@ namespace DSENT
         const String& link_wire_layer = getParameter("Link->WireLayer");
         const String& link_wire_width_multiplier = getParameter("Link->WireWidthMultiplier");
         const String& link_wire_spacing_multiplier = getParameter("Link->WireSpacingMultiplier");
-		
+		const String& num_layers = getParameter("TSV->NumLayers");
         unsigned  router_ports = getParameter("Router->NumberPorts").toUInt();
 
         getGenProperties()->set("NumberRouters", 1);
@@ -125,6 +130,7 @@ namespace DSENT
 		ElectricalModel* ver_link = (ElectricalModel*) ModelGen::createModel("TSV", "VerticalLink", getTechModel());
         ver_link->setParameter("NumberBits", number_bits_per_flit);
 		ver_link->setParameter("Frequency", getParameter("Frequency"));
+		ver_link->setParameter("NumLayers", num_layers );
         ver_link->construct(); 
 
         // Connect ports
@@ -225,6 +231,7 @@ namespace DSENT
 			ElectricalModel* asym_ver_link = (ElectricalModel*) ModelGen::createModel("TSV", "AsymVerticalLink", getTechModel());
             asym_ver_link->setParameter("NumberBits", number_bits_per_flit_asym);
 			asym_ver_link->setParameter("Frequency", getParameter("Frequency"));
+			asym_ver_link->setParameter("NumLayers", num_layers );
             asym_ver_link->construct();
 
             // Connect ports
@@ -308,7 +315,6 @@ namespace DSENT
         double rr_link_delay = std::max(1e-99, 1.0 / clock_freq - link_delay_margin);
         double router_delay = 1.0 / clock_freq;
 
-        //double ver_link_length = getProperty("VerticalLinkLength");
 		double ver_link_length = getProperty("TSV->Length");
 		double ver_link_diameter = getProperty("TSV->Diameter");
 		double ver_link_pitch = getProperty("TSV->Pitch");
@@ -326,7 +332,6 @@ namespace DSENT
 		ver_link->setProperty("Pitch", ver_link_pitch);
 		ver_link->setProperty("BumpDiameter", ver_link_bump_diameter);
         ver_link->setProperty("Delay", rr_link_delay);
-        //ver_link->setProperty("IsKeepParity", "TRUE");
         ver_link->update();
 
         ElectricalModel* router = (ElectricalModel*)getSubInstance("MeshRouter");
@@ -349,7 +354,6 @@ namespace DSENT
 			asym_ver_link->setProperty("Pitch", ver_link_pitch);
 			asym_ver_link->setProperty("BumpDiameter", ver_link_bump_diameter);
             asym_ver_link->setProperty("Delay", rr_link_delay);
-            //asym_ver_link->setProperty("IsKeepParity", "TRUE");
             asym_ver_link->update();
 
             ElectricalModel* asym_router = (ElectricalModel*)getSubInstance("AsymMeshRouter");

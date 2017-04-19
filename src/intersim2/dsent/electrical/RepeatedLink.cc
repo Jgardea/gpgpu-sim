@@ -78,7 +78,6 @@ namespace DSENT
         double wire_width = wire_min_width * wire_width_multiplier;
         double wire_spacing = wire_min_spacing * wire_spacing_multiplier;
 		
-		cout << endl;
         double wire_cap_per_len = getTechModel()->calculateWireCapacitance(wire_layer, wire_width, wire_spacing, 1.0);
         double wire_res_per_len = getTechModel()->calculateWireResistance(wire_layer, wire_width, 1.0);
 
@@ -238,10 +237,7 @@ namespace DSENT
             }
         }
 
-		cout << "Wire | Res = " << wire_res_per_len << endl;
-		cout << "Wire | Cap = " << wire_cap_per_len << " | " << number_segments << endl;
-		cout << "Wire | Total Res = " << total_wire_res << endl;
-		cout << "Wire | Total Cap = " << total_wire_cap << " | " << number_segments << endl << endl;
+		//cout << "\nWire | Total Res = " << total_wire_res << "\tTotal Cap = " << total_wire_cap << " | " << number_segments << endl;
 
         // Update electrical interfaces
         getLoad("In_Cap")->setLoadCap(m_repeater_->getNet("A")->getTotalDownstreamCap());
