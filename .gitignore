@@ -10,6 +10,7 @@ src/intersim2/dsent/main.cpp
 src/intersim2/dsent/main
 src/intersim2/dsent/*.o
 src/intersim2/dsent/*/*.o
+src/intersim2/booksim
 
 libcuda/cuobjdump_lexer.c
 libcuda/cuobjdump_parser.c
