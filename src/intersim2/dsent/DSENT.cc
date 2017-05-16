@@ -18,15 +18,17 @@ namespace DSENT
         
         // Build the specified model in the config file
         buildModel();
-        
+       
         // Process the specified queries
         processQuery();
-
+		
         // Store results in a easy to access way for Booksim  // jgardea
         getResults( ); // jgardea
+		
         //printResults( ); // jgardea                                       Used for debugging
         // Finalize DSENT framework (close log file, ...)
         finalize();
+		
         return ms_energy_results;
     }
 
@@ -439,7 +441,7 @@ namespace DSENT
         for ( unsigned i = 0; i < ms_results.size(); i++  )
         {
             temp_results = ms_results[i]->getResults( is_asymmetric );
-            
+           	
             for ( unsigned j = 0; j < temp_results->size(); j++)
             {
                 component = temp_results->at(j);

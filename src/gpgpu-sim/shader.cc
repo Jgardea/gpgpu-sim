@@ -628,7 +628,7 @@ void shader_core_ctx::fetch()
                 unsigned offset_in_block = pc & (m_config->m_L1I_config.get_line_sz()-1);
                 if( (offset_in_block+nbytes) > m_config->m_L1I_config.get_line_sz() )
                     nbytes = (m_config->m_L1I_config.get_line_sz()-offset_in_block);
-
+				
                 // TODO: replace with use of allocator
                 // mem_fetch *mf = m_mem_fetch_allocator->alloc()
                 mem_access_t acc(INST_ACC_R,ppc,nbytes,false);
@@ -1919,16 +1919,16 @@ void shader_core_ctx::register_cta_thread_exit( unsigned cta_num )
       m_n_active_cta--;
       m_barriers.deallocate_barrier(cta_num);
       shader_CTA_count_unlog(m_sid, 1);
-      printf("GPGPU-Sim uArch: Shader %d finished CTA #%d (%lld,%lld), %u CTAs running\n", m_sid, cta_num, gpu_sim_cycle, gpu_tot_sim_cycle,
-             m_n_active_cta );
+      //printf("GPGPU-Sim uArch: Shader %d finished CTA #%d (%lld,%lld), %u CTAs running\n", m_sid, cta_num, gpu_sim_cycle, gpu_tot_sim_cycle, // jgardea
+      //       m_n_active_cta );
       if( m_n_active_cta == 0 ) {
           assert( m_kernel != NULL );
           m_kernel->dec_running();
-          printf("GPGPU-Sim uArch: Shader %u empty (release kernel %u \'%s\').\n", m_sid, m_kernel->get_uid(),
-                 m_kernel->name().c_str() );
+          //printf("GPGPU-Sim uArch: Shader %u empty (release kernel %u \'%s\').\n", m_sid, m_kernel->get_uid(), // jgardea
+          //       m_kernel->name().c_str() );
           if( m_kernel->no_more_ctas_to_run() ) {
               if( !m_kernel->running() ) {
-                  printf("GPGPU-Sim uArch: GPU detected kernel \'%s\' finished on shader %u.\n", m_kernel->name().c_str(), m_sid );
+                  //printf("GPGPU-Sim uArch: GPU detected kernel \'%s\' finished on shader %u.\n", m_kernel->name().c_str(), m_sid ); // jgardea
                   m_gpu->set_kernel_done( m_kernel );
               }
           }
@@ -2415,12 +2415,12 @@ unsigned int shader_core_config::max_cta( const kernel_info_t &k ) const
    static const struct gpgpu_ptx_sim_kernel_info* last_kinfo = NULL;
    if (last_kinfo != kernel_info) {   //Only print out stats if kernel_info struct changes
       last_kinfo = kernel_info;
-      printf ("GPGPU-Sim uArch: CTA/core = %u, limited by:", result);
-      if (result == result_thread) printf (" threads");
+      //printf ("GPGPU-Sim uArch: CTA/core = %u, limited by:", result); // jgardea
+      //if (result == result_thread) printf (" threads");
       if (result == result_shmem) printf (" shmem");
       if (result == result_regs) printf (" regs");
       if (result == result_cta) printf (" cta_limit");
-      printf ("\n");
+      //printf ("\n");
    }
 
     //gpu_max_cta_per_shader is limited by number of CTAs if not enough to keep all cores busy    
@@ -3291,7 +3291,7 @@ void simt_core_cluster::icnt_inject_request_packet(class mem_fetch *mf)
    if (!mf->get_is_write() && !mf->isatomic()) {
       packet_size = mf->get_ctrl_size(); 
    }
-   printf("\t\tCore request size %d\n", packet_size);
+   
    m_stats->m_outgoing_traffic_stats->record_traffic(mf, packet_size); 
    unsigned destination = mf->get_sub_partition_id();
    mf->set_status(IN_ICNT_TO_MEM,gpu_sim_cycle+gpu_tot_sim_cycle);
@@ -3326,17 +3326,19 @@ void simt_core_cluster::icnt_cycle()
         mem_fetch *mf = (mem_fetch*) ::icnt_pop(m_cluster_id);
         if (!mf) 
             return;
+		 
         assert(mf->get_tpc() == m_cluster_id);
         assert(mf->get_type() == READ_REPLY || mf->get_type() == WRITE_ACK );
         
         // The packet size varies depending on the type of request: 
-        // - For read request and atomic request, the packet contains the data 
+        // - For read request and atomic request, the packet contains the data  |        read reply ?
         // - For write-ack, the packet only has control metadata
         unsigned int packet_size = (mf->get_is_write())? mf->get_ctrl_size() : mf->size(); 
         m_stats->m_incoming_traffic_stats->record_traffic(mf, packet_size); 
         mf->set_status(IN_CLUSTER_TO_SHADER_QUEUE,gpu_sim_cycle+gpu_tot_sim_cycle);
         //m_memory_stats->memlatstat_read_done(mf,m_shader_config->max_warps_per_shader);
         m_response_fifo.push_back(mf);
+		// flit stats is wrong as it does not reflect the flit size stablished in booksim  . jgardea
         m_stats->n_mem_to_simt[m_cluster_id] += mf->get_num_flits(false);
     }
 }

@@ -765,6 +765,7 @@ void baseline_cache::send_read_request(new_addr_type addr, new_addr_type block_a
 
         m_mshrs.add(block_addr,mf);
         m_extra_mf_fields[mf] = extra_mf_fields(block_addr,cache_index, mf->get_data_size());
+		
         mf->set_data_size( m_config.get_line_sz() );
         m_miss_queue.push_back(mf);
         mf->set_status(m_miss_queue_status,time);

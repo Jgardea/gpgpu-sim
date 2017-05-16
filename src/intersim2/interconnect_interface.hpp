@@ -32,6 +32,7 @@
 #include <queue>
 #include <iostream>
 #include <map>
+
 using namespace std;
 
 
@@ -42,6 +43,7 @@ class TrafficManager;
 class IntersimConfig;
 class Network;
 class Stats;
+class Power_Module;
 
 //TODO: fixed_lat_icnt, add class support? support for signle network
 
@@ -58,9 +60,10 @@ public:
   virtual void* Pop(unsigned ouput_deviceID);
   virtual void Advance();
   virtual bool Busy() const;
-  virtual bool HasBuffer(unsigned deviceID, unsigned int size) const;
+  virtual int NetworkSelection( int pckt_info, unsigned icntID ); //jgardea
+  virtual bool HasBuffer( unsigned deviceID, unsigned int size) const;
   virtual void DisplayStats() const;
-  virtual void DisplayOverallStats() const;
+  virtual void DisplayOverallStats();
   unsigned GetFlitSize() const;
   
   virtual void DisplayState(FILE* fp) const;
@@ -96,7 +99,9 @@ protected:
   void _CreateBuffer( );
   void _CreateNodeMap(unsigned n_shader, unsigned n_mem, unsigned n_node, int use_map);
   void _DisplayMap(int dim,int count);
-  
+ 
+  bool NetworkHasBuffer(int subnet, unsigned icntID, unsigned int size, unsigned int n_flits) const; // jgardea
+
   // size: [subnets][nodes][vcs]
   vector<vector<vector<_BoundaryBufferItem> > > _boundary_buffer;
   unsigned int _boundary_buffer_capacity;
@@ -114,6 +119,7 @@ protected:
   GPUTrafficManager* _traffic_manager;
  
   unsigned _flit_size;
+  unsigned _asym_flit_size;   // jgardea
   IntersimConfig* _icnt_config;
   unsigned _n_shader, _n_mem;
   vector<Network *> _net;
@@ -128,6 +134,8 @@ protected:
   //icntID to deviceID map
   map<unsigned, unsigned> _reverse_node_map;
 
+  // jgardea
+  Power_Module* dsent_module;
 };
 
 #endif

@@ -113,6 +113,7 @@ void linear_to_raw_address_translation::addrdec_parseoption(const char *option)
 {
    unsigned int dramid_start = 0;
    int dramid_parsed = sscanf(option, "dramid@%d", &dramid_start);
+   
    if (dramid_parsed == 1) {
       ADDR_CHIP_S = dramid_start;
    } else {
@@ -167,10 +168,14 @@ void linear_to_raw_address_translation::init(unsigned int n_channel, unsigned in
    m_n_channel = n_channel;
    m_n_sub_partition_in_channel = n_sub_partition_in_channel; 
 
+   printf("Chip bits: %u Channels: %u subpartitions: %u ADDR_CHIP_S: %u\n", nchipbits, n_channel, m_n_sub_partition_in_channel, ADDR_CHIP_S);
+   
    gap = (n_channel - ::powli(2,nchipbits));
+   printf("Gap: %d\n", gap);
    if (gap) {
       nchipbits++;
    }
+   printf("nchipbits: %u gpgpu_mem_address_mask: %u\n", nchipbits, gpgpu_mem_address_mask );
    switch (gpgpu_mem_address_mask) {
    case 0: 
       //old, added 2row bits, use #define ADDR_CHIP_S 10
@@ -273,6 +278,8 @@ void linear_to_raw_address_translation::init(unsigned int n_channel, unsigned in
    if (addrdec_option != NULL) 
       addrdec_parseoption(addrdec_option);
 
+  printf("ADDR_CHIP_S %u\n", ADDR_CHIP_S);
+
    if (ADDR_CHIP_S != -1) { 
       if (!gap) {
          // number of chip is power of two: 
@@ -300,16 +307,17 @@ void linear_to_raw_address_translation::init(unsigned int n_channel, unsigned in
    addrdec_getmasklimit(addrdec_mask[COL],   &addrdec_mkhigh[COL],   &addrdec_mklow[COL]  );
    addrdec_getmasklimit(addrdec_mask[BURST], &addrdec_mkhigh[BURST], &addrdec_mklow[BURST]);
 
-   printf("addr_dec_mask[CHIP]  = %016llx \thigh:%d low:%d\n", addrdec_mask[CHIP],  addrdec_mkhigh[CHIP],  addrdec_mklow[CHIP] );
-   printf("addr_dec_mask[BK]    = %016llx \thigh:%d low:%d\n", addrdec_mask[BK],    addrdec_mkhigh[BK],    addrdec_mklow[BK]   );
-   printf("addr_dec_mask[ROW]   = %016llx \thigh:%d low:%d\n", addrdec_mask[ROW],   addrdec_mkhigh[ROW],   addrdec_mklow[ROW]  );
-   printf("addr_dec_mask[COL]   = %016llx \thigh:%d low:%d\n", addrdec_mask[COL],   addrdec_mkhigh[COL],   addrdec_mklow[COL]  );
-   printf("addr_dec_mask[BURST] = %016llx \thigh:%d low:%d\n", addrdec_mask[BURST], addrdec_mkhigh[BURST], addrdec_mklow[BURST]);
+   printf("addr_dec_mask[CHIP]   = %016llx \thigh:%d low:%d\n", addrdec_mask[CHIP],  addrdec_mkhigh[CHIP],  addrdec_mklow[CHIP] );
+   printf("addr_dec_mask[BK]     = %016llx \thigh:%d low:%d\n", addrdec_mask[BK],    addrdec_mkhigh[BK],    addrdec_mklow[BK]   );
+   printf("addr_dec_mask[ROW]    = %016llx \thigh:%d low:%d\n", addrdec_mask[ROW],   addrdec_mkhigh[ROW],   addrdec_mklow[ROW]  );
+   printf("addr_dec_mask[COL]    = %016llx \thigh:%d low:%d\n", addrdec_mask[COL],   addrdec_mkhigh[COL],   addrdec_mklow[COL]  );
+   printf("addr_dec_mask[BURST]  = %016llx \thigh:%d low:%d\n", addrdec_mask[BURST], addrdec_mkhigh[BURST], addrdec_mklow[BURST]);
 
    // create the sub partition ID mask (for removing the sub partition ID from the partition address)
    sub_partition_id_mask = 0; 
    if (m_n_sub_partition_in_channel > 1) {
       unsigned n_sub_partition_log2 = LOGB2_32(m_n_sub_partition_in_channel); 
+	  printf ("n_sub_partition_log2 %u\n", n_sub_partition_log2);
       unsigned pos=0;
       for (unsigned i=addrdec_mklow[BK];i<addrdec_mkhigh[BK];i++) {
          if ((addrdec_mask[BK] & ((unsigned long long int)1<<i)) != 0) {
@@ -321,7 +329,7 @@ void linear_to_raw_address_translation::init(unsigned int n_channel, unsigned in
       }
    }
    printf("sub_partition_id_mask = %016llx\n", sub_partition_id_mask);
-
+	
    if (run_test) {
       sweep_test(); 
    }

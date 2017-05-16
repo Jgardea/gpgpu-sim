@@ -2,14 +2,15 @@
 
 #TODO write instructions
 
-# it can be run in three ways 
-# 1 string input
-# configuration parameters
-# without paramters
+# it can be run in three ways: 
+# 	-1 string input
+# 	-configuration parameters
+# 	-without paramters
 
+# ./run_booksim.sh -n network -t traffic_pattern -w write ratio -c cycles
 
 #booksim source path
-exec_path="/home/kaya1/jgardea/GPGPU-SIM/gpgpu-sim/src/intersim2/"
+exec_path="/home/kaya1/jgardea/GPGPU-SIM/gpgpu-sim/src/intersim2"
 
 #default executable and configuration file
 sim="$exec_path/booksim"
@@ -27,6 +28,7 @@ args=($@)
 net_topo=""
 traffic=""
 write_rate=""
+sim_cycles=""
 i=0
 
 for arg in "${args[@]}"
@@ -44,12 +46,16 @@ do
 	elif [ "$arg" == "-w" ]; then
 		i=$(($i + 1))    
 		write_rate=${args[${i}]}
+	
+	elif [ "$arg" == "-c" ]; then
+		i=$(($i + 1))
+		sim_cycles="sample_period=${args[${i}]}"
 	fi
 	i=$(($i + 1))
 done
 
-#This mode runs booksim with only with the confiruation file
-if [ "$net_topo" == "" ] && [ "$traffic" == "" ] && [ "$write_rate" == "" ]; then
+#This mode runs booksim only with the confiruation file
+if [ "$net_topo" == "" ] && [ "$traffic" == "" ] && [ "$write_rate" == "" ] && [ "$sim_cycles" == "" ]; then
 	${sim_run} 
 	exit
 fi
@@ -125,7 +131,7 @@ if [ "$write_rate" != "" ]; then
    str_wr_rate="write_fraction=${write_rate}" 
 fi
 
-param_overwrite="${str_net} ${str_traffic} ${str_wr_rate} ${str_pckt_sizes}"
+param_overwrite="${str_net} ${str_traffic} ${str_wr_rate} ${str_pckt_sizes} ${sim_cycles}"
 echo $param_overwrite
 sim_run="${sim} ${configfile} ${param_overwrite}"
 
@@ -138,22 +144,23 @@ log_path="${result_dir}/logs"
 power_path="${result_dir}/power"
 log_name="${write_rate}_${traffic}_${net_topo}"
 
-if [ ! -d "$result_dir" ]; then
-	mkdir $result_dir
+if [ ! -d "$result_dir" ]; then 
+	mkdir $result_dir 
 fi
 
-if [ ! -d "$log_path" ]; then
+if [ ! -d "$log_path" ]; then 
 	mkdir "$log_path" 
 fi 
 
-if [ ! -d "$power_path" ]; then
-	mkdir "$power_path"
+if [ ! -d "$power_path" ]; then 
+	mkdir "$power_path" 
 fi
 
 # Log files set up
 zero_load_log="${log_path}/zero_load_${log_name}.log"
 sat_load_log="${log_path}/sat_load_${log_name}.log"
 temp_log=$log_name
+
 # result files set up
 zero_power="${power_path}/zero_${traffic}_${write_rate}.dat"
 sat_power="${power_path}/sat_${traffic}_${write_rate}.dat"
@@ -162,8 +169,8 @@ result="${result_dir}/${log_name}.dat"
 initial_step=0.02
 zero_load_inj=0.0025
 
-if [ -f $result ]; then
-	rm $result
+if [ -f $result ]; then 
+	rm $result 
 fi
 
 echo "SWEEP: Determining zero-load latency..."

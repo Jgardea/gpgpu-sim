@@ -1,0 +1,71 @@
+// Jesus Gardea
+// Network Configuration for a 64 Nodes 3D Mesh Network
+
+
+use_map = 1;  // my implementation of the memory map
+flit_size = 256; 
+asym_flit_size = 192;
+
+// Topology
+topology = mesh;
+k = 4;
+n = 3;
+s = 1;
+
+subnets = 1;
+subnet_selection = 1;       // 1 = rounrobin; 2 = random 3 = based on pckt size
+
+// Routing
+
+routing_function = dor; // routefunc = topology + routing_function
+//reply_rf = xyz;
+
+// Buffers
+// This buffer must be bigger than number of flits per packet 
+// Ill be usign 2 pakets long buffers
+
+input_buffer_size = 30;
+ejection_buffer_size = 30;
+boundary_buffer_size = 30;
+
+vc_buf_size = 8;
+num_vcs     = 16;
+
+wait_for_tail_credit = 0;
+vc_busy_when_full = 1;
+
+// Router architecture
+
+router = iq;	// need to change for mesh
+
+vc_allocator = islip; //separable_input_first;
+sw_allocator = islip; //separable_input_first;
+alloc_iters  = 1;
+
+credit_delay   = 0;
+routing_delay  = 0;
+vc_alloc_delay = 1;
+sw_alloc_delay = 1;
+st_final_delay = 1;
+verc_arb_delay = 0;
+
+channel_latency = 1;
+speculative = 0;
+
+input_speedup     = 1;
+output_speedup    = 1;
+internal_speedup  = 1.0;
+
+sim_type       = gpgpusim;
+
+read_request_begin_vc = 0;
+read_request_end_vc = 3;
+write_request_begin_vc = 4;
+write_request_end_vc = 7;
+read_reply_begin_vc = 8;
+read_reply_end_vc = 11;
+write_reply_begin_vc = 12;
+write_reply_end_vc = 15;
+
+////////// DSENT ///////////////////
+dsent_config_file = /home/kaya1/jgardea/GPGPU-SIM/gpgpu-sim/src/intersim2/dsent/electrical-mesh.cfg;

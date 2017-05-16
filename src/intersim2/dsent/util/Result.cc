@@ -199,15 +199,15 @@ namespace DSENT
         String asym_link = "AsymLink";
         String asym_router = "AsymMeshRouter";
         String asym_vertical_link = "AsymVerticalLink";
-
+		
         for(vector<SubResult*>::const_iterator it = m_sub_results_.begin();
                 it != m_sub_results_.end(); ++it)
         {
             const SubResult* sub_result = (*it);
-            const Result* result = sub_result->getResult();
+			const Result* result = sub_result->getResult();
             const String producer = sub_result->getProducer();
             const String result_name = result->getName();
-
+			
             if (producer == link)
             {
                 pair<String, double> event(result_name, result->calculateSum() );
@@ -229,7 +229,7 @@ namespace DSENT
                     " not currenlty taking in consideration for energy calculations" << endl;
             }
         }
-     
+    	
         link_results.first = link;
         link_results.second = link_components;
         router_results.first = router;

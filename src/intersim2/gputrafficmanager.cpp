@@ -39,7 +39,7 @@ GPUTrafficManager::GPUTrafficManager( const Configuration &config, const vector<
 {
   // The total simulations equal to number of kernels
   _total_sims = 0;
-  
+  _time = 0; 
   _input_queue.resize(_subnets);
   for ( int subnet = 0; subnet < _subnets; ++subnet) {
     _input_queue[subnet].resize(_nodes);
@@ -55,10 +55,11 @@ GPUTrafficManager::~GPUTrafficManager()
 
 void GPUTrafficManager::Init()
 {
-  _time = 0;
+  /* For overall interconnect stats stats and _time  		jgardea
+  should not be reset everytime GPGPUsim calls booksim*/
+  //_time = 0;			
   _sim_state = running;
-  _ClearStats( );
-  
+  //_ClearStats( );
 }
 
 void GPUTrafficManager::_RetireFlit( Flit *f, int dest )
@@ -265,7 +266,7 @@ void GPUTrafficManager::_GeneratePacket(int source, int stype, int cl, int time,
     assert(_cur_id);
     f->pid    = pid;
     f->watch  = watch | (gWatchOut && (_flits_to_watch.count(f->id) > 0));
-    f->subnetwork = subnetwork;
+    f->subnetwork = subnet;//subnetwork;
     f->src    = source;
     f->ctime  = time;
     f->record = record;

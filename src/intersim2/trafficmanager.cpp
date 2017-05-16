@@ -52,7 +52,7 @@ TrafficManager * TrafficManager::New(Configuration const & config,
     } else if(sim_type == "batch") {
         result = new BatchTrafficManager(config, net);
     }
-#ifdef BOOKSIM
+#ifdef BOOKSIM  // jgardea: needed for stand alone booksim 
 
 #else
     else if(sim_type == "gpgpusim") {
@@ -637,6 +637,8 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
 
     _slowest_flit.resize(_classes, -1);
     _slowest_packet.resize(_classes, -1);
+
+	_ClearStats();
 }
 
 TrafficManager::~TrafficManager( )

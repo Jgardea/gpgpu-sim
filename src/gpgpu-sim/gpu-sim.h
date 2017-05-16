@@ -187,7 +187,7 @@ struct memory_config {
          option_parser_delimited_string(dram_opp, gpgpu_dram_timing_opt, "=:;"); 
          fprintf(stdout, "DRAM Timing Options:\n"); 
          option_parser_print(dram_opp, stdout); 
-         option_parser_destroy(dram_opp); 
+         option_parser_destroy(dram_opp);
       }
 
       int nbkt = nbk/nbkgrp;

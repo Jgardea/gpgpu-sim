@@ -913,14 +913,14 @@ __host__ cudaError_t CUDARTAPI cudaLaunch( const char *hostFun )
 	gpgpusim_ptx_assert( !g_cuda_launch_stack.empty(), "empty launch stack" );
 	kernel_config config = g_cuda_launch_stack.back();
 	struct CUstream_st *stream = config.get_stream();
-	printf("\nGPGPU-Sim PTX: cudaLaunch for 0x%p (mode=%s) on stream %u\n", hostFun,
-			g_ptx_sim_mode?"functional simulation":"performance simulation", stream?stream->get_uid():0 );
+	//printf("\nGPGPU-Sim PTX: cudaLaunch for 0x%p (mode=%s) on stream %u\n", hostFun, // jgardea
+	//		g_ptx_sim_mode?"functional simulation":"performance simulation", stream?stream->get_uid():0 );
 	kernel_info_t *grid = gpgpu_cuda_ptx_sim_init_grid(hostFun,config.get_args(),config.grid_dim(),config.block_dim(),context);
 	std::string kname = grid->name();
 	dim3 gridDim = config.grid_dim();
 	dim3 blockDim = config.block_dim();
-	printf("GPGPU-Sim PTX: pushing kernel \'%s\' to stream %u, gridDim= (%u,%u,%u) blockDim = (%u,%u,%u) \n",
-			kname.c_str(), stream?stream->get_uid():0, gridDim.x,gridDim.y,gridDim.z,blockDim.x,blockDim.y,blockDim.z );
+	//printf("GPGPU-Sim PTX: pushing kernel \'%s\' to stream %u, gridDim= (%u,%u,%u) blockDim = (%u,%u,%u) \n",
+	//		kname.c_str(), stream?stream->get_uid():0, gridDim.x,gridDim.y,gridDim.z,blockDim.x,blockDim.y,blockDim.z );
 	stream_operation op(grid,g_ptx_sim_mode,stream);
 	g_stream_manager->push(op);
 	g_cuda_launch_stack.pop_back();
@@ -1279,7 +1279,7 @@ std::string get_app_binary(){
    self_exe_path[path_length] = '\0'; 
 #endif
 
-   printf("self exe links to: %s\n", self_exe_path); 
+   printf("self exe links to: %s\n", self_exe_path);
    return self_exe_path; 
 }
 
@@ -1303,11 +1303,11 @@ void extract_code_using_cuobjdump(){
 	close(fd);
 	// Running cuobjdump using dynamic link to current process
 	snprintf(command,1000,"md5sum %s ", app_binary.c_str());
-	printf("Running md5sum using \"%s\"\n", command);
+	//printf("Running md5sum using \"%s\"\n", command); // jgardea
 	system(command);
 	// Running cuobjdump using dynamic link to current process
 	snprintf(command,1000,"$CUDA_INSTALL_PATH/bin/cuobjdump -ptx -elf -sass %s > %s", app_binary.c_str(), fname);
-	printf("Running cuobjdump using \"%s\"\n", command);
+	//printf("Running cuobjdump using \"%s\"\n", command); // jgardea
 	bool parse_output = true; 
 	int result = system(command);
 	if(result) {

@@ -64,8 +64,15 @@ Power_Module::Power_Module(vector<Network *> n , const Configuration &config)
 
   frequency = 1000000000 * atof(config.GetStr("frequency").c_str()); // frequency in Hz
 
+  total_dynamic = 0.0;
+  total_leakage = 0.0;
+
   // asymmetric networks work only with mesh3D topology
   if (asymmetric) assert(topology == "mesh3D");
+
+  runDsent();  
+
+  // jgardea
 
   string pfile = config.GetStr("tech_file");
   PowerConfig pconfig;
@@ -564,19 +571,17 @@ void Power_Module::run(){
 
 void Power_Module::dsent()
 {
-    double total_dynamic = 0.0;
-    double total_leakage = 0.0;
-    
-    runDsent( );
-   
+    total_dynamic = 0.0;
+    total_leakage = 0.0;
+
     for (unsigned n = 0; n < nets.size(); n++ )
     {
         calcNetPower(nets[n], n);
         total_dynamic += total_network_dynam[n];
         total_leakage += total_network_leakage[n];
     }
-   
-   	cout << "\nTotal Cycles:                             " << totalTime << endl; 
+	
+	cout << "\nTotal Cycles:                             " << totalTime << endl; 
     cout << "Total Router Dynamic Power:               " << total_components_dynam[_router] << endl;
     cout << "Total Router Leakage Power:               " << total_components_leakage[_router] << endl;
     cout << "Total Router Power:                       " << total_components_leakage[_router] + total_components_dynam[_router] << endl;
@@ -607,7 +612,6 @@ void Power_Module::dsent()
 
 void Power_Module::runDsent( )
 {
-    
     vector<string> config_dsent; 
     config_dsent.push_back("-cfg");
     config_dsent.push_back(dsent_config_file);
@@ -647,7 +651,7 @@ void Power_Module::calcNetPower(Network *net, int index)
     Mesh3D* net_mesh3d;
     vector<VerticalChannel *> ver_chan;
     vector<int> verchan_activity;
-    int verchan_sum = 0;
+    unsigned long verchan_sum = 0;
 
     totalTime = GetSimTime();
    
@@ -664,7 +668,7 @@ void Power_Module::calcNetPower(Network *net, int index)
             verchan_sum += ver_chan[i]->GetActivity()[0];
         }
     }
-// ================ Calculating Channel Values =====================
+    // ================ Calculating Channel Values =====================
     vector<FlitChannel *> inject = net->GetInject();
     vector<FlitChannel *> eject = net->GetEject();
     vector<FlitChannel *> chan = net->GetChannels();
@@ -673,9 +677,9 @@ void Power_Module::calcNetPower(Network *net, int index)
     vector<int> eject_activity(eject.size(), 0);
     vector<int> channel_activity(chan.size(), 0);
     
-    int inject_sum = 0;
-    int eject_sum = 0;
-    int chan_sum = 0;
+    unsigned long  inject_sum = 0;
+    unsigned long  eject_sum = 0;
+    unsigned long  chan_sum = 0;
     
     // We are accessing class 0 under the assumption we are only using one class
      
@@ -706,14 +710,14 @@ void Power_Module::calcNetPower(Network *net, int index)
     vector< int > router_arbitrations(routers.size(), 0);      // switch arbitrations for each router
     
     vector<int> writes;                                 // temp values 
-    vector<int> reads;              
-    vector<int> traversals;         
-    vector<int> arbitration;        
+    vector<int> reads;
+    vector<int> traversals;
+    vector<int> arbitration;
 
-    long total_writes = 0;
-    long total_reads = 0;
-    long total_traversals = 0;
-    long total_arbitrations = 0;
+    unsigned long total_writes = 0;
+    unsigned long total_reads = 0;
+    unsigned long total_traversals = 0;
+    unsigned long total_arbitrations = 0;
 
     int inputs;
    
@@ -752,7 +756,7 @@ void Power_Module::calcNetPower(Network *net, int index)
     
     calcEnergy(asymmetric && index); // get the values from dsent result
 
-	if (0)
+	if (1)
 	{
 		cout << "Writes: " << total_writes <<  endl;
 		cout << "Reads: " << total_reads << endl;
@@ -764,8 +768,6 @@ void Power_Module::calcNetPower(Network *net, int index)
 		cout << "Vertica Channel Sends: " << verchan_sum << endl;
 		cout << "Horizontal Channels Sends: " << eject_sum + inject_sum + chan_sum << endl;
 	}
-
-    
 
     double write_power = (total_writes/totalTime) * write_energy * frequency;
     double read_power = (total_reads/totalTime) * read_energy * frequency;
@@ -803,7 +805,7 @@ void Power_Module::calcNetPower(Network *net, int index)
     total_network_dynam[index] = total_dynamic;
     total_network_leakage[index] = total_leakage; 
 
-	if ( 0 ) // subnet detailed info
+	if ( 1 ) // subnet detailed info
 	{
 		// Subnetwork values display
 		cout<< "\n-----------------------------------------\n" ;
@@ -858,14 +860,17 @@ void Power_Module::getMonitors(const SwitchMonitor * &sm, const BufferMonitor * 
 
 void Power_Module::calcEnergy(bool asymmetric )
 {
+    // Buffer elements
     write_energy = 0.0;
     read_energy = 0.0;
+    // arbitration elements
     traversal_energy = 0.0;
     arb1_energy = 0.0;
     arb2_energy = 0.0;
+    //channels
     channel_energy = 0.0;
     ver_channel_energy = 0.0;
-
+    // Leakage
     router_leakage = 0.0;
     channel_leakage = 0.0;
     ver_channel_leakage = 0.0;

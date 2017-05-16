@@ -122,25 +122,14 @@ bool mem_fetch::isconst() const
 }
 
 /// Returns number of flits traversing interconnect. simt_to_mem specifies the direction
+// This funciton  does not reflect the flit size stablished in booksim  . jgarde
 unsigned mem_fetch::get_num_flits(bool simt_to_mem){
 	unsigned sz=0;
 	// If atomic, write going to memory, or read coming back from memory, size = ctrl + data. Else, only ctrl
 	if( isatomic() || (simt_to_mem && get_is_write()) || !(simt_to_mem || get_is_write()) )
-    {
-        if (isatomic()) cout << "Atomic-Size: " << size() << endl;
-        else if ( (simt_to_mem && get_is_write()) ) cout << "Write-Request: " << size() << endl;
-        else if (!(simt_to_mem || get_is_write()) ) cout << "Read-Reply: " << size() << endl;
         sz = size();
-    }	
 	else
-    {
         sz = get_ctrl_size();
-        if (simt_to_mem && !get_is_write()) cout << "Read-Request: " << sz << endl;
-        else cout << "Write-Reply: " << sz << endl;
-    }
-		
-
-
 	return (sz/icnt_flit_size) + ( (sz % icnt_flit_size)? 1:0);
 }
 

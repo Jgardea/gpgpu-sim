@@ -437,6 +437,7 @@ void gpgpu_sim_config::reg_options(option_parser_t opp)
     option_parser_register(opp, "-trace_sampling_memory_partition", OPT_INT32, 
                           &Trace::sampling_memory_partition, "The memory partition which is printed using MEMPART_DPRINTF. Default -1 (i.e. all)",
                           "-1");
+    
    ptx_file_line_stats_options(opp);
 }
 
@@ -583,10 +584,11 @@ gpgpu_sim::gpgpu_sim( const gpgpu_sim_config &config )
 
     icnt_wrapper_init();
     icnt_create(m_shader_config->n_simt_clusters,m_memory_config->m_n_mem_sub_partition);
-    
+    fprintf(stdout, "\nInterconnect Created.\n\n");
+
     time_vector_create(NUM_MEM_REQ_STAT);
     fprintf(stdout, "GPGPU-Sim uArch: performance model initialization complete.\n");
-
+    fflush(stdout); 
     m_running_kernels.resize( config.max_concurrent_kernel, NULL );
     m_last_issued_kernel = 0;
     m_last_cluster_issue = 0;
@@ -1100,7 +1102,7 @@ void shader_core_ctx::issue_block2core( kernel_info_t &kernel )
     m_n_active_cta++;
 
     shader_CTA_count_log(m_sid, 1);
-    printf("GPGPU-Sim uArch: core:%3d, cta:%2u initialized @(%lld,%lld)\n", m_sid, free_cta_hw_id, gpu_sim_cycle, gpu_tot_sim_cycle );
+    //printf("GPGPU-Sim uArch: core:%3d, cta:%2u initialized @(%lld,%lld)\n", m_sid, free_cta_hw_id, gpu_sim_cycle, gpu_tot_sim_cycle ); // jgardea
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -1168,7 +1170,7 @@ void gpgpu_sim::cycle()
             mem_fetch* mf = m_memory_sub_partition[i]->top();
             if (mf) {
                 unsigned response_size = mf->get_is_write()?mf->get_ctrl_size():mf->size();
-                cout << "\t\t Mem2device Response Size " << response_size << endl;
+                
                 if ( ::icnt_has_buffer( m_shader_config->mem2device(i), response_size ) ) {
                     if (!mf->get_is_write()) 
                        mf->set_return_timestamp(gpu_sim_cycle+gpu_tot_sim_cycle);

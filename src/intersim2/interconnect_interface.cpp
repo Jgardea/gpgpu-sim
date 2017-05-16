@@ -37,8 +37,8 @@
 #include "routefunc.hpp"
 #include "globals.hpp"
 #include "trafficmanager.hpp"
-#include "power_module.hpp"
 #include "mem_fetch.h"
+#include "power_module.hpp"
 #include "flit.hpp"
 #include "gputrafficmanager.hpp"
 #include "booksim.hpp"
@@ -46,7 +46,8 @@
 #include "network.hpp"
 #include "random_utils.hpp"     // jgardea
 
-enum NetSelection { _pckt_type, _one_net, _round_robin, _random, _pckt_size }; // subnetwork selection jgardea
+//enum NetSelection { _pckt_type, _one_net, _round_robin, _random, _pckt_size }; // subnetwork selection jgardea
+enum NetSelection { _pckt_type, _round_robin, _random, _pckt_size }; // subnetwork selection jgardea
 
 InterconnectInterface* InterconnectInterface::New(const char* const config_file)
 {
@@ -57,7 +58,6 @@ InterconnectInterface* InterconnectInterface::New(const char* const config_file)
   InterconnectInterface* icnt_interface = new InterconnectInterface();
   icnt_interface->_icnt_config = new IntersimConfig();
   icnt_interface->_icnt_config->ParseFile(config_file);
-
   return icnt_interface;
 }
 
@@ -66,20 +66,13 @@ InterconnectInterface::InterconnectInterface()
 
 }
 
-InterconnectInterface::~InterconnectInterface() // TODO get dsent to go thtrough here
+InterconnectInterface::~InterconnectInterface() 
 {
-  
-  //jgardea DSENT power module
-  if ( _icnt_config->GetInt("sim_power") > 0 )
-  {
-      Power_Module pnet(_net, *_icnt_config);
-      pnet.dsent();
-  }
-
   for (int i=0; i<_subnets; ++i) {
     delete _net[i];
   }
-
+  delete dsent_module;
+  dsent_module = NULL;
   delete _traffic_manager;
   _traffic_manager = NULL;
   delete _icnt_config;
@@ -119,9 +112,9 @@ void InterconnectInterface::CreateInterconnect(unsigned n_shader, unsigned n_mem
 
   assert(_icnt_config->GetStr("sim_type") == "gpgpusim");  
   _traffic_manager = static_cast<GPUTrafficManager*>(TrafficManager::New( *_icnt_config, _net )) ;
-  
+ 
   _flit_size = _icnt_config->GetInt( "flit_size" );
-
+  _asym_flit_size = _icnt_config->GetInt( "asym_flit_size" );
   // Config for interface buffers
   if (_icnt_config->GetInt("ejection_buffer_size")) {
     _ejection_buffer_capacity = _icnt_config->GetInt( "ejection_buffer_size" ) ;
@@ -134,38 +127,35 @@ void InterconnectInterface::CreateInterconnect(unsigned n_shader, unsigned n_mem
   if (_icnt_config->GetInt("input_buffer_size")) {
     _input_buffer_capacity = _icnt_config->GetInt("input_buffer_size");
   } else {
-    _input_buffer_capacity = 15;
-    //_input_buffer_capacity = 9;
+    _input_buffer_capacity = 16;
   }
   _vcs = _icnt_config->GetInt("num_vcs");
-
+    
   _CreateBuffer();
+
   _CreateNodeMap(_n_shader, _n_mem, _traffic_manager->_nodes, _icnt_config->GetInt("use_map"));
 }
 
 void InterconnectInterface::Init()
 {
   _traffic_manager->Init();
-  // TODO: Should we init _round_robin_turn?
-  //       _boundary_buffer, _ejection_buffer and _ejected_flit_queue should be cleared
 }
 
+//TODO: move to _IssuePacket
+//TODO: create a Inject and wrap _IssuePacket and _GeneratePacket
 void InterconnectInterface::Push(unsigned input_deviceID, unsigned output_deviceID, void *data, unsigned int size)
 {
   // it should have free buffer
   assert(HasBuffer(input_deviceID, size));
-  
+
   int output_icntID = _node_map[output_deviceID];
   int input_icntID = _node_map[input_deviceID];
 
-#if 0
-  cout<<"Call interconnect push input: "<<input<<" output: "<<output<<endl;
-#endif
-
-  //TODO: move to _IssuePacket
-  //TODO: create a Inject and wrap _IssuePacket and _GeneratePacket
-  unsigned int n_flits = size / _flit_size + ((size % _flit_size)? 1:0);
-  int subnet;
+  // Flits will be measured in bits for DSENT power model so I multiplied the size of the incoming data by 8
+  int size_n_bits  = size * 8; // jgardea
+  unsigned int n_flits = (size_n_bits) / _flit_size + ((size_n_bits % _flit_size)? 1:0);
+ 
+  if( gNetSelec == _pckt_size ) n_flits = (size_n_bits) / _asym_flit_size + ((size_n_bits % _asym_flit_size)?1:0);
 
   //TODO: Remove mem_fetch to reduce dependency
   Flit::FlitType packet_type;
@@ -179,39 +169,21 @@ void InterconnectInterface::Push(unsigned input_deviceID, unsigned output_device
     default: assert (0);
   }
 
-  // Subnet Selection
-  switch (gNetSelec)  // jgardea
+  int subnet;
+  for ( int net = 0; net < _subnets; net++ )
   {
-    case _pckt_type:   // default  
-      if (input_deviceID < _n_shader ) subnet = 0;
-      else subnet = 1;
-      break;
-    case _one_net:  
-      subnet = 0; 
-      break;
-    case _round_robin: 
-      subnet = gSubnet; 
-      gSubnet++;
-      if ( gSubnet == _subnets ) gSubnet = 0;
-      break;
-    case _random: 
-      subnet = RandomInt(_subnets-1);
-      break;
-    case _pckt_size:
-      switch (packet_type)
-      {
-        case READ_REQUEST:
-        case WRITE_ACK:
-          subnet= 0;
-          break;
-        case READ_REPLY:
-        case WRITE_REQUEST:
-          subnet = 1;
-          break;
-        default: assert(0);
-      }
-     default: assert(0);
+	  subnet = NetworkSelection(packet_type, input_deviceID);
+	  if (NetworkHasBuffer(subnet, input_icntID, size, n_flits)) break;
+	  subnet = -1;
   }
+ 
+  //it should have subnet >= 0
+  assert(subnet >= 0);
+
+  if (0) 
+  	cout << "Input node: " << input_deviceID << " Output Node: " << output_deviceID << " Size: " << size_n_bits 
+  	     << " Flit size: " << ((gNetSelec == _pckt_size) ? _asym_flit_size : _flit_size) << " Num-Flits: " << n_flits << " Subnet: " << subnet << " Type: " 
+		 << packet_type << endl;
 
   //TODO: _include_queuing ?
   _traffic_manager->_GeneratePacket( input_icntID, -1, 0 /*class*/, _traffic_manager->_time, subnet, n_flits, packet_type, data, output_icntID);
@@ -235,7 +207,7 @@ void* InterconnectInterface::Pop(unsigned deviceID)
  // int subnet = 0;
  // if (deviceID < _n_shader)
   //  subnet = 1;
-  
+ 
   int turn; 
   int subnet = _round_robin_subnet_turn[icntID];                       // jgardea // fair check of all the networks
 
@@ -245,7 +217,7 @@ void* InterconnectInterface::Pop(unsigned deviceID)
     turn = _round_robin_turn[subnet][icntID];
 
     for (int vc=0;(vc<_vcs) && (data==NULL);vc++) {                  // original code
-      
+     	
       if (_boundary_buffer[subnet][icntID][turn].HasPacket()) {
         data = _boundary_buffer[subnet][icntID][turn].PopPacket();
       }
@@ -275,6 +247,7 @@ void InterconnectInterface::Advance()
 
 bool InterconnectInterface::Busy() const
 {
+  // 0 is for class
   bool busy = !_traffic_manager->_total_in_flight_flits[0].empty();
   if (!busy) {
     for (int s = 0; s < _subnets; ++s) {
@@ -298,15 +271,94 @@ bool InterconnectInterface::Busy() const
   return false;
 }
 
+
+// Subnet Selection  // jgardea
+ // Added a network selction function based on the configurations I am using in Booksim
+
+int InterconnectInterface::NetworkSelection( int pckt_info, unsigned icntID  )
+{
+	int subnet = 0;
+	switch (gNetSelec)  // jgardea
+	{
+		case _pckt_type:   // default  
+		  if (icntID < _n_shader ) subnet = 0;
+		  else subnet = 1;
+		  break;
+		case _round_robin:		// default for 4 symmetric subnetworks
+		  subnet = gSubnet; 
+		  gSubnet++;
+		  if ( gSubnet == _subnets ) gSubnet = 0;
+		  break;
+		case _random: 			// Randonm subnet selection
+		  subnet = RandomInt(_subnets-1);
+		  break;
+		case _pckt_size:			// For asymmetric subnets based on packet size
+		  switch (pckt_info)
+		  {
+			case READ_REQUEST:
+			case WRITE_ACK:
+			  subnet= 0;
+			  break;
+			case READ_REPLY:
+			case WRITE_REQUEST:
+			  subnet = 1;
+			  break;
+			default: assert(0);
+		  }
+		  break;
+		 default: assert(0);
+	}
+	return subnet;
+}
+
+// For multiple networks it is necessary to check which network is avialable
+bool InterconnectInterface::NetworkHasBuffer(int subnet, unsigned icntID, unsigned int size, unsigned int n_flits ) const
+{
+	return  ((_traffic_manager->_input_queue[subnet][icntID][0].size() + n_flits) <= _input_buffer_capacity);
+}
+
 bool InterconnectInterface::HasBuffer(unsigned deviceID, unsigned int size) const
 {
-  bool has_buffer = false;
-  unsigned int n_flits = size / _flit_size + ((size % _flit_size)? 1:0);
-  int icntID = _node_map.find(deviceID)->second;
-  has_buffer = _traffic_manager->_input_queue[0][icntID][0].size() +n_flits <= _input_buffer_capacity;
+  // flits are measured in bits 									// jgardea
+  // Also added a way to check all subnets 
 
-  if ((_subnets>1) && deviceID >= _n_shader) // deviceID is memory node
-    has_buffer = _traffic_manager->_input_queue[1][icntID][0].size() +n_flits <= _input_buffer_capacity;
+  bool has_buffer = false;
+  unsigned int size_n_bits = size * 8;
+  unsigned int n_flits = size_n_bits / _flit_size + ((size_n_bits % _flit_size)? 1:0);
+
+  int icntID = _node_map.find(deviceID)->second;
+
+  int subnet = 0;
+  switch (gNetSelec)  // jgardea
+  {
+  	case _pckt_type:   // default 
+	  subnet = (deviceID > _n_shader);
+	  has_buffer = _traffic_manager->_input_queue[subnet][icntID][0].size() +n_flits <= _input_buffer_capacity;
+  	  break;
+  	case _round_robin:		// default for 4 symmetric subnetworks
+	case _random:
+	  for ( int net = 0; net < _subnets; net++)
+	  {
+	    has_buffer = _traffic_manager->_input_queue[net][icntID][0].size() +n_flits <= _input_buffer_capacity;
+		if (has_buffer) break;
+	  }
+	  break;
+  	case _pckt_size:			// For asymmetric subnets based on packet size
+	  if ( size_n_bits <= _flit_size ) subnet= 0;
+	  else 
+      { // If packets is going through the wide subnet then the number of flit is different
+        subnet = 1;
+        n_flits = size_n_bits / _asym_flit_size + ((size_n_bits % _asym_flit_size)? 1:0);
+      }
+	  has_buffer = _traffic_manager->_input_queue[subnet][icntID][0].size() +n_flits <= _input_buffer_capacity;
+	  break;
+  	 default: assert(0);
+  }
+
+  //has_buffer = _traffic_manager->_input_queue[0][icntID][0].size() +n_flits <= _input_buffer_capacity;
+
+  //if ((_subnets>1) && deviceID >= _n_shader) // deviceID is memory node
+  //  has_buffer = _traffic_manager->_input_queue[1][icntID][0].size() +n_flits <= _input_buffer_capacity;
 
   return has_buffer;
 }
@@ -314,7 +366,7 @@ bool InterconnectInterface::HasBuffer(unsigned deviceID, unsigned int size) cons
 void InterconnectInterface::DisplayStats() const
 {
   _traffic_manager->UpdateStats();
-  _traffic_manager->DisplayStats();
+  //_traffic_manager->DisplayStats();
 }
 
 unsigned InterconnectInterface::GetFlitSize() const
@@ -322,7 +374,7 @@ unsigned InterconnectInterface::GetFlitSize() const
   return _flit_size;
 }
 
-void InterconnectInterface::DisplayOverallStats() const
+void InterconnectInterface::DisplayOverallStats() //const
 {
   // hack: booksim2 use _drain_time and calculate delta time based on it, but we don't, change this if you have a better idea
   _traffic_manager->_drain_time = _traffic_manager->_time;
@@ -330,10 +382,18 @@ void InterconnectInterface::DisplayOverallStats() const
   _traffic_manager->_total_sims += 1;
 
   _traffic_manager->_UpdateOverallStats();
-  _traffic_manager->_ChannelUtilizationStats(); // jgardea
   _traffic_manager->DisplayOverallStats();
+  _traffic_manager->_ChannelUtilizationStats(); // jgardea
   if(_traffic_manager->_print_csv_results) {
     _traffic_manager->DisplayOverallStatsCSV();
+  }
+  
+  //jgardea DSENT power module
+  if ( _icnt_config->GetInt("sim_power") > 0 )
+  {
+	  if ( !dsent_module ) dsent_module = new Power_Module(_net, *_icnt_config);
+      //Power_Module pnet(_net, *_icnt_config);
+      dsent_module->dsent();
   }
 }
 
@@ -440,51 +500,54 @@ void InterconnectInterface::_CreateNodeMap(unsigned n_shader, unsigned n_mem, un
     // The (<SM, Memory>, Memory Location Vector) map
     map<pair<unsigned,unsigned>, vector<unsigned> > preset_memory_map;
 
-    cout << "\t\tShaders " << n_shader << " Memory nodes " << n_mem << " Nodes " << n_node << endl; // jgardea
+   // cout << "\t\tShaders " << n_shader << " Memory nodes " << n_mem << " Nodes " << n_node << endl; // jgardea
 
-    // preset memory and shader map, optimized for mesh
-    // good for 8 SMs and 8 memory ports, the map is as follows:
-    // +--+--+--+--+
-    // |C0|M0|C1|M1|
-    // +--+--+--+--+
-    // |M2|C2|M3|C3|
-    // +--+--+--+--+
-    // |C4|M4|C5|M5|
-    // +--+--+--+--+
-    // |M6|C6|M7|C7|
-    // +--+--+--+--+
+/* ====================================================================
+    I am unsing my own memory map
+   ==================================================================== */
 
-    {
-      unsigned memory_node[] = {1, 3, 4, 6, 9, 11, 12, 14};
-      preset_memory_map[make_pair(8,8)] = vector<unsigned>(memory_node, memory_node+8);
-    }
-
-    // good for 28 SMs and 8 memory ports
-    {
-      unsigned memory_node[] = {3, 7, 10, 12, 23, 25, 28, 32};
-      preset_memory_map[make_pair(28,8)] = vector<unsigned>(memory_node, memory_node+8);
-    }
-
-    // good for 56 SMs and 8 memory cores
-    {
-      unsigned memory_node[] = {3, 15, 17, 29, 36, 47, 49, 61};
-      preset_memory_map[make_pair(56,8)] = vector<unsigned>(memory_node, memory_node+sizeof(memory_node)/sizeof(unsigned));
-    }
-
-    // good for 110 SMs and 11 memory cores
-    {
-      unsigned memory_node[] = {12, 20, 25, 28, 57, 60, 63, 92, 95,100,108};
-      preset_memory_map[make_pair(110, 11)] = vector<unsigned>(memory_node, memory_node+sizeof(memory_node)/sizeof(unsigned));
-    }
+//    // preset memory and shader map, optimized for mesh
+//    // good for 8 SMs and 8 memory ports, the map is as follows:
+//    // +--+--+--+--+
+//    // |C0|M0|C1|M1|
+//    // +--+--+--+--+
+//    // |M2|C2|M3|C3|
+//    // +--+--+--+--+
+//    // |C4|M4|C5|M5|
+//    // +--+--+--+--+
+//    // |M6|C6|M7|C7|
+//    // +--+--+--+--+
+//
+//    {
+//      unsigned memory_node[] = {1, 3, 4, 6, 9, 11, 12, 14};
+//      preset_memory_map[make_pair(8,8)] = vector<unsigned>(memory_node, memory_node+8);
+//    }
+//
+//    // good for 28 SMs and 8 memory ports
+//    {
+//      unsigned memory_node[] = {3, 7, 10, 12, 23, 25, 28, 32};
+//      preset_memory_map[make_pair(28,8)] = vector<unsigned>(memory_node, memory_node+8);
+//    }
+//
+//    // good for 56 SMs and 8 memory cores
+//    {
+//      unsigned memory_node[] = {3, 15, 17, 29, 36, 47, 49, 61};
+//      preset_memory_map[make_pair(56,8)] = vector<unsigned>(memory_node, memory_node+sizeof(memory_node)/sizeof(unsigned));
+//    }
+//
+//    // good for 110 SMs and 11 memory cores
+//    {
+//      unsigned memory_node[] = {12, 20, 25, 28, 57, 60, 63, 92, 95,100,108};
+//      preset_memory_map[make_pair(110, 11)] = vector<unsigned>(memory_node, memory_node+sizeof(memory_node)/sizeof(unsigned));
+//    }
 
     // good for VB-3Dmesh  // jgardea
     {
-      unsigned memory_node[n_mem];
+      unsigned memory_node[n_mem]; 
       unsigned m, i;
       for ( m = n_shader, i = 0; m < n_node; m++, i ++ )
       {
         memory_node[i] = m;
-        cout << "i = " << i << " m = " << m << endl;
       }
       preset_memory_map[make_pair(n_shader, n_mem )] = vector<unsigned>(memory_node, memory_node+sizeof(memory_node)/sizeof(unsigned)); 
     }
@@ -537,7 +600,7 @@ void InterconnectInterface::_CreateNodeMap(unsigned n_shader, unsigned n_mem, un
   }
 
   //FIXME: should compatible with non-square number
-  _DisplayMap((int) sqrt(n_node), n_node);
+  //_DisplayMap((int) sqrt(n_node), n_node);
 
 }
 

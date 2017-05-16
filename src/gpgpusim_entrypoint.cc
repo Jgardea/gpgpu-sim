@@ -90,23 +90,28 @@ void *gpgpu_sim_thread_concurrent(void*)
 {
     // concurrent kernel execution simulation thread
     do {
+		 
        if(g_debug_execution >= 3) {
           printf("GPGPU-Sim: *** simulation thread starting and spinning waiting for work ***\n");
           fflush(stdout);
        }
-        while( g_stream_manager->empty_protected() && !g_sim_done )
-            ;
-        if(g_debug_execution >= 3) {
+	   
+        while( g_stream_manager->empty_protected() && !g_sim_done );
+       
+		if(g_debug_execution >= 3) {
            printf("GPGPU-Sim: ** START simulation thread (detected work) **\n");
            g_stream_manager->print(stdout);
            fflush(stdout);
         }
+		
         pthread_mutex_lock(&g_sim_lock);
         g_sim_active = true;
         pthread_mutex_unlock(&g_sim_lock);
         bool active = false;
         bool sim_cycles = false;
+	
         g_the_gpu->init();
+		
         do {
             // check if a kernel has completed
             // launch operation on device if one is pending and can be run
@@ -118,6 +123,7 @@ void *gpgpu_sim_thread_concurrent(void*)
             // another kernel, the gpu is not re-initialized and the inter-kernel
             // behaviour may be incorrect. Check that a kernel has finished and
             // no other kernel is currently running.
+			
             if(g_stream_manager->operation(&sim_cycles) && !g_the_gpu->active())
                 break;
 
@@ -127,6 +133,7 @@ void *gpgpu_sim_thread_concurrent(void*)
                 g_the_gpu->deadlock_check();
             }
             active=g_the_gpu->active() || !g_stream_manager->empty_protected();
+			
         } while( active );
 
         if(g_debug_execution >= 3) {
@@ -135,12 +142,16 @@ void *gpgpu_sim_thread_concurrent(void*)
         }
         if(sim_cycles) {
             g_the_gpu->update_stats();
+			g_the_gpu->print_stats();
             print_simulation_time();
         }
-        pthread_mutex_lock(&g_sim_lock);
+    	
+	   	pthread_mutex_lock(&g_sim_lock);
         g_sim_active = false;
         pthread_mutex_unlock(&g_sim_lock);
+		
     } while( !g_sim_done );
+	
     if(g_debug_execution >= 3) {
        printf("GPGPU-Sim: *** simulation thread exiting ***\n");
        fflush(stdout);
@@ -234,7 +245,8 @@ void print_simulation_time()
    s = difference - 60*(m + 60*(h + 24*d));
 
    fflush(stderr);
-   printf("\n\ngpgpu_simulation_time = %u days, %u hrs, %u min, %u sec (%u sec)\n",
+  // printf("\n\ngpgpu_simulation_time = %u days, %u hrs, %u min, %u sec (%u sec)\n",
+	printf("gpgpu_simulation_time = %u days, %u hrs, %u min, %u sec (%u sec)\n",
           (unsigned)d, (unsigned)h, (unsigned)m, (unsigned)s, (unsigned)difference );
    printf("gpgpu_simulation_rate = %u (inst/sec)\n", (unsigned)(g_the_gpu->gpu_tot_sim_insn / difference) );
    printf("gpgpu_simulation_rate = %u (cycle/sec)\n", (unsigned)(gpu_tot_sim_cycle / difference) );

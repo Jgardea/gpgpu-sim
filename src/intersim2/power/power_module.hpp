@@ -76,6 +76,8 @@ protected:
   double ver_channel_leakage;
 
   double frequency;
+  double total_dynamic;
+  double total_leakage;
   // .. jgardea
 
   int classes;
