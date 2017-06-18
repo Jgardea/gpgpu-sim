@@ -331,7 +331,7 @@ bool IQ3DRouter::_ReceiveFlits( )
       // jgardea
 
       int input_direction = GetOutportDir(input);    
-      if ( input_direction == _up || input_direction == _down )  
+      if ( input_direction == _up || input_direction == _down ) // bus receiver
       {
         int fdest = f->dest;
         int fpid = f->pid; 

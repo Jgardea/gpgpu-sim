@@ -46,7 +46,6 @@
 #include "network.hpp"
 #include "random_utils.hpp"     // jgardea
 
-//enum NetSelection { _pckt_type, _one_net, _round_robin, _random, _pckt_size }; // subnetwork selection jgardea
 enum NetSelection { _pckt_type, _round_robin, _random, _pckt_size }; // subnetwork selection jgardea
 
 InterconnectInterface* InterconnectInterface::New(const char* const config_file)
