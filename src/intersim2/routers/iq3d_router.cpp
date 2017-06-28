@@ -781,8 +781,13 @@ void IQ3DRouter::_VCAllocEvaluate( )
         // reflected in "in_priority". On the output side, if multiple VCs are 
         // requesting the same output VC, the priority of VCs is based on the 
         // actual packet priorities, which is reflected in "out_priority".
-       
-        if(!dest_buf->IsAvailableFor(out_vc) ||  ( (out_vc%gS) != _zvalue ) ) 
+     
+        bool vc_restricted = false;                   // jgardea  
+        int outport_dir = GetOutportDir(out_port);
+        if ( (outport_dir == _up || outport_dir == _down) && ((out_vc%gS) != _zvalue) ) vc_restricted = true;
+
+        //if(!dest_buf->IsAvailableFor(out_vc) ||  ( (out_vc%gS) != _zvalue ) ) 
+        if(!dest_buf->IsAvailableFor(out_vc) || vc_restricted )
         { //jgardea 
           if ( 0 ) // this part is just printing, but it produces a seg fault that I haven't worked on 
           { // jgardea
@@ -967,8 +972,13 @@ void IQ3DRouter::_VCAllocEvaluate( )
       assert(f);
       assert(f->vc == vc);
       assert(f->head);
-      
-      if(!dest_buf->IsAvailableFor(match_vc) ||  ( (match_vc%gS) != _zvalue ) ) { //jgardea
+     
+      bool vc_restricted = false;                   // jgardea  
+      int outport_dir = GetOutportDir(match_output);
+      if ( (outport_dir == _up || outport_dir == _down) && ((match_vc%gS) != _zvalue) ) vc_restricted = true;
+
+      if(!dest_buf->IsAvailableFor(match_vc) ||  vc_restricted) { //jgardea
+      //if(!dest_buf->IsAvailableFor(match_vc) ||  ( (match_vc%gS) != _zvalue ) ) { //jgardea
         if(f->watch) {
           *gWatchOut << GetSimTime() << " | " << FullName() << " | "
                << "  Discarding previously generated grant for VC " << vc
@@ -1058,7 +1068,13 @@ void IQ3DRouter::_VCAllocUpdate( )
       }
       
       BufferState * const dest_buf = _next_buf[match_output];
-      assert(dest_buf->IsAvailableFor(match_vc)  &&  ( (match_vc%gS) == _zvalue ) ); //jgardea
+
+      bool vc_restricted = false;                   // jgardea  
+      int outport_dir = GetOutportDir(match_output);
+      if ( (outport_dir == _up || outport_dir == _down) && ((match_vc%gS) != _zvalue) ) vc_restricted = true;
+
+      assert(dest_buf->IsAvailableFor(match_vc)  && !vc_restricted ); //jgardea
+      //assert(dest_buf->IsAvailableFor(match_vc)  &&  ( (match_vc%gS) == _zvalue ) ); //jgardea
      
       dest_buf->TakeBuffer(match_vc, input*_vcs + vc);
       
@@ -1646,11 +1662,18 @@ void IQ3DRouter::_SWAllocEvaluate( )
         assert(vc_start >= 0 && vc_start < _vcs);
         assert(vc_end >= 0 && vc_end < _vcs);
         assert(vc_end >= vc_start);
-        
+       
+        bool vc_restricted = false;                   // jgardea  
+        int outport_dir = GetOutportDir(dest_output);
+        if ( (outport_dir == _up || outport_dir == _down) ) vc_restricted = true;
+
         for(int dest_vc = vc_start; dest_vc <= vc_end; ++dest_vc) {
           assert((dest_vc >= 0) && (dest_vc < _vcs));
-          
-          if(dest_buf->IsAvailableFor(dest_vc) && ( (dest_vc%gS) == _zvalue )  && ( _output_buffer_size==-1 || _output_buffer[dest_output].size()<(size_t)(_output_buffer_size))) { //jgardea
+         
+          if (vc_restricted && ((dest_vc%gS) == _zvalue) ) vc_restricted = false;
+
+          //if(dest_buf->IsAvailableFor(dest_vc) && ( (dest_vc%gS) == _zvalue )  && ( _output_buffer_size==-1 || _output_buffer[dest_output].size()<(size_t)(_output_buffer_size))) { //jgardea
+            if(dest_buf->IsAvailableFor(dest_vc) && !vc_restricted  && ( _output_buffer_size==-1 || _output_buffer[dest_output].size()<(size_t)(_output_buffer_size))) { //jgardea
             elig = true;
             if(!_spec_check_cred || !dest_buf->IsFullFor(dest_vc)) {
               cred = true;
@@ -1767,7 +1790,7 @@ void IQ3DRouter::_SWAllocEvaluate( )
       int const granted_vc = _sw_allocator->ReadRequest(expanded_input, expanded_output);
       if(granted_vc == vc) 
       {
-        int outport_dir = GetOutportDir(expanded_output );                                    // - - - - - - - - Vertical Allocation 
+        int outport_dir = GetOutportDir(expanded_output );                                    // - - - - - - - - Vertical Allocation /jgardea 
         if ( outport_dir == _up || outport_dir == _down )
         {
           int index = distance( _sw_alloc_vcs.begin(), iter );
@@ -2052,7 +2075,13 @@ void IQ3DRouter::_SWAllocEvaluate( )
               for(int out_vc = vc_start; out_vc <= vc_end; ++out_vc) 
               {
                 assert((out_vc >= 0) && (out_vc < _vcs));
-                if(dest_buf->IsAvailableFor(out_vc) && ( (out_vc%gS) == _zvalue ) ) {
+
+                bool vc_restricted = false;                   // jgardea  
+                int outport_dir = GetOutportDir(output);
+                if ( (outport_dir == _up || outport_dir == _down) && ((out_vc%gS) != _zvalue ) ) vc_restricted = true;
+
+                //if(dest_buf->IsAvailableFor(out_vc) && ( (out_vc%gS) == _zvalue ) ) {
+                  if(dest_buf->IsAvailableFor(out_vc) && !vc_restricted ) {
                   busy = false;
                   if(!dest_buf->IsFullFor(out_vc)) {
                     full = false;
@@ -2224,8 +2253,14 @@ void IQ3DRouter::_SWAllocUpdate( )
               // FIXME: This check should probably be performed in Evaluate(), 
               // not Update(), as the latter can cause the outcome to depend on 
               // the order of evaluation!
+
+              bool vc_restricted = false;                   // jgardea  
+              int outport_dir = GetOutportDir(output);
+              if ( (outport_dir == _up || outport_dir == _down) && ((out_vc%gS) != _zvalue ) ) vc_restricted = true;
+
               if(dest_buf->IsAvailableFor(out_vc) && 
-                ( (out_vc%gS) == _zvalue ) && 
+                //( (out_vc%gS) == _zvalue ) && 
+                !vc_restricted &&                      // jgardea 
                 !dest_buf->IsFullFor(out_vc) &&
                 ((match_vc < 0) || 
                 RoundRobinArbiter::Supersedes(out_vc, vc_prio, 
